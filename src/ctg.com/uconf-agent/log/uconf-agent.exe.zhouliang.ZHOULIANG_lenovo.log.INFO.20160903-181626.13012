@@ -1,0 +1,68 @@
+Log file created at: 2016/09/03 18:16:26
+Running on machine: zhouliang
+Binary: Built with gc go1.6 for windows/amd64
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I0903 18:16:26.753736   13012 yamlUitls.go:74] 开始读取Agent配置文件C:\Home\golang\zerocode\src\ctg.com\uconf-agent\conf\uconf.yml
+I0903 18:16:26.764744   13012 yamlUitls.go:86] 成功读取Agent配置文件,配置内容如下:
+enabled: true						#是否监听配置变化
+server:
+ ip: 127.0.0.1						#10.142.90.23 服务端Ip
+ port: 8080							#服务端port
+ context: 							#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+apps:								#本地应用数组
+- name: uconf_demo					#应用名称
+  tenant: fj						#应用所属租户
+  version: 1_0_0_0					#应用版本
+  env: rd							#应用环境类型(rd：开发环境)
+  tmpdir: e:\uconf_demo\tmp			#配置临时存储目录(暂时没用到，可以去了)
+  appdir: e:\uconf_demo				#应用根目录
+  configs:							#应用所有配置文件数组
+  - name: remote.properties			#配置文件名称
+    dir: conf						#配置文件相对应用根目录的路径
+  - name: redis.properties			#这是另外一份配置文件的信息
+    dir: conf
+#- name: crm_1.0					#这是另外一个应用
+#  tenant: fj
+#  version: 1_0_0_0
+#  env: rd
+#  tmpdir: /tmp/crm/conf
+#  appdir: /home/app/crm
+#  configs:
+#  - name: redis.properties
+#    dir: /home/app/crm/conf    
+#  - name: mq.properties
+#    dir: /home/app/crm/conf
+I0903 18:16:26.764744   13012 yamlUitls.go:57] 开始解析Agent配置文件:uconf.yml.
+I0903 18:16:26.765745   13012 yamlUitls.go:63] 成功解析Agent配置文件.
+I0903 18:16:26.860813   13012 main.go:34] zk服务器地址列表:192.168.224.1:2181
+I0903 18:16:26.872821   13012 main.go:37] zk根路径:/uconf
+I0903 18:16:26.873821   13012 zkMgr.go:103] 开始建立Zk连接.
+I0903 18:16:26.873821   13012 zkMgr.go:31] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 192.168.224.1:2181}].
+I0903 18:16:26.877824   13012 zkMgr.go:31] 监听到Zk连接状态变更事件[{EventSession StateConnected  <nil> 192.168.224.1:2181}].
+I0903 18:16:26.916852   13012 zkMgr.go:31] 监听到Zk连接状态变更事件[{EventSession StateHasSession  <nil> 192.168.224.1:2181}].
+I0903 18:16:26.916852   13012 zkMgr.go:33] 与ZK服务器会话建立成功.
+I0903 18:16:26.916852   13012 zkMgr.go:81] 与zk服务器建立连接成功.
+I0903 18:16:26.916852   13012 zkMgr.go:107] 成功建立Zk连接.
+I0903 18:16:26.936866   13012 main.go:114] -----------------开始下载配置-----------------
+I0903 18:16:26.936866   13012 main.go:114] -----------------开始下载配置-----------------
+I0903 18:16:26.979896   13012 main.go:117] 下载配置成功，开始保存文件
+I0903 18:16:26.979896   13012 main.go:118] 配置文件内容为:
+redis.host=127.0.0.1
+
+redis.port=qef111
+I0903 18:16:26.981898   13012 main.go:120] 配置文件已保存到:e:\uconf_demo\conf\redis.properties.
+I0903 18:16:26.981898   13012 main.go:127] 开始校验Zk上是否有配置信息.
+I0903 18:16:26.982900   13012 main.go:132] 开始校验Zk上有配置信息成功.
+I0903 18:16:26.982900   13012 main.go:91] 开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_127.0.0.1_24a70dc144fa4f37ab5e06798cf9dcb4
+I0903 18:16:26.993906   13012 main.go:117] 下载配置成功，开始保存文件
+I0903 18:16:26.993906   13012 main.go:118] 配置文件内容为:
+remoteHost=127.0.0.12
+remotePort=zdwd
+I0903 18:16:26.993906   13012 main.go:93] Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_127.0.0.1_24a70dc144fa4f37ab5e06798cf9dcb4.
+I0903 18:16:26.993906   13012 main.go:98] 开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0903 18:16:26.998910   13012 main.go:120] 配置文件已保存到:e:\uconf_demo\conf\remote.properties.
+I0903 18:16:26.998910   13012 main.go:127] 开始校验Zk上是否有配置信息.
+I0903 18:16:27.000912   13012 main.go:132] 开始校验Zk上有配置信息成功.
+I0903 18:16:27.000912   13012 main.go:91] 开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_127.0.0.1_24a70dc144fa4f37ab5e06798cf9dcb4
+I0903 18:16:27.017923   13012 main.go:93] Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_127.0.0.1_24a70dc144fa4f37ab5e06798cf9dcb4.
+I0903 18:16:27.017923   13012 main.go:98] 开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
