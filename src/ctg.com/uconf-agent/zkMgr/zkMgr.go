@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"ctg.com/uconf-agent/consts"
 	"ctg.com/uconf-agent/strutils"
 	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
@@ -14,14 +15,14 @@ import (
 //zk的客户端连接实例，不暴露
 var zkConn *zk.Conn
 
-const RetryTimes int = 3
-const RetryGap = time.Second * 5
-const ConnectTimeOut = time.Second * 5
-
 var connectLock sync.Mutex
 var servers []string
 var connectChn chan int = make(chan int)
 var recovering bool = false
+
+type StateCallback func(isConnected bool)
+
+var Callback StateCallback
 
 //处理连接状态变更的回调函数
 func stateChangeCallback(event zk.Event) {
@@ -31,18 +32,21 @@ func stateChangeCallback(event zk.Event) {
 	glog.Infof("监听到Zk连接状态变更事件[%v].", event)
 	if event.State == zk.StateHasSession {
 		glog.Info("与ZK服务器会话建立成功.")
+		Callback(true)
 		connectChn <- 1
 	}
 	if event.State == zk.StateDisconnected {
 		//这是由于网络不通或服务器没启动等原因造成的
 		if !recovering {
 			glog.Errorln("与zk服务器连接失败.开始重试.")
+			Callback(false)
 			reconnect()
 		}
 	}
 	if event.State == zk.StateExpired {
 		if !recovering {
 			glog.Info("会话失效，准备重连.")
+			Callback(false)
 			reconnect()
 		}
 	}
@@ -64,7 +68,7 @@ func reconnect() {
 		glog.Infof("尝试第%d次连接zk服务器.", i+1)
 		if connected := connect(); !connected {
 			glog.Errorf("尝试第%d次连接zk服务器失败.", i+1)
-			time.Sleep(RetryGap)
+			time.Sleep(consts.ZkConnectRetryGap)
 		} else {
 			break
 		}
@@ -80,7 +84,7 @@ func connect() bool {
 	case <-connectChn:
 		glog.Info("与zk服务器建立连接成功.")
 		return true
-	case <-time.After(ConnectTimeOut):
+	case <-time.After(consts.ZkConnectTimeOut):
 		glog.Errorln("与zk服务器连接连接超时.")
 		//关闭连接，会触发StateDisconnected事件，然后在callback中进行reconnect
 		zkConn.Close()
@@ -89,32 +93,47 @@ func connect() bool {
 }
 
 //判断节点是否存在
-func ExistsNode(path string) bool {
+func ExistsNode(path string) (bool, error) {
 	//glog.Info("path is ", path)
-	exists, _, err := zkConn.Exists(path)
-	if err != nil {
-		log.Fatalf("check zknode s% exists err v% ", path, err)
+	var rErr error
+	for i := 0; i < consts.ZkCallerRetryTimes; i++ {
+		exists, _, err := zkConn.Exists(path)
+		if err != nil {
+			rErr = err
+			retryRemainTimes := consts.ZkCallerRetryTimes - (i + 1)
+			checkError(err)
+			log.Printf("调用zk接口判断节点%s是否存在时，出现异常，将在%d秒后将重试，剩余重试次数:%d", path, consts.ZkCallerRetryGap/time.Second, retryRemainTimes)
+			time.Sleep(consts.ZkCallerRetryGap)
+			continue
+		} else {
+			return exists, nil
+		}
 	}
-	return exists
+	return false, rErr
+
 }
 
 //初始化Zk连接
-func InitZk(servs []string) bool {
+func InitZk(servs []string, sc StateCallback) bool {
 	glog.Info("开始建立Zk连接.")
 	servers = servs
+	Callback = sc
 	isConnected := connect()
-
 	glog.Info("成功建立Zk连接.")
 	return isConnected
 }
 
 func writeData(path string, data []byte) bool {
-	if !ExistsNode(path) {
+	exists, err := ExistsNode(path)
+	if err != nil {
+		return false
+	}
+	if !exists {
 		return false
 	} else {
 		_, err := zkConn.Set(path, []byte(data), -1)
 		if err != nil {
-			log.Fatalf("set value of node s% err v% ", path, err)
+			glog.Errorf("write data to s% err v% ", path, err)
 			return false
 		}
 	}
@@ -126,13 +145,15 @@ func CreateNode(path string, data []byte) bool {
 }
 
 func createZkNode(path string, data []byte, flags int32) bool {
-	if !ExistsNode(path) {
+	exists, err := ExistsNode(path)
+	if err != nil {
+		return false
+	}
+	if !exists {
 		_, err := zkConn.Create(path, data, flags, zk.WorldACL(zk.PermAll))
 		if err != nil {
-			log.Fatalf("create node s% err v% ", path, err)
-			if !ExistsNode(path) {
-				return false
-			}
+			glog.Errorf("create node s% err v% ", path, err)
+			return false
 		}
 	}
 	return true
@@ -140,11 +161,19 @@ func createZkNode(path string, data []byte, flags int32) bool {
 
 //递归创建节点，即：如果父节点不存在，先创建父节点
 func CreateNodeRecursion(path string, data []byte) {
-	if ExistsNode(path) {
+	exists, err := ExistsNode(path)
+	if err != nil {
+		return
+	}
+	if exists {
 		return
 	}
 	pp := parentPath(path)
-	if !ExistsNode(pp) {
+	exists, err = ExistsNode(pp)
+	if err != nil {
+		return
+	}
+	if !exists {
 		CreateNodeRecursion(pp, []byte(""))
 	}
 	CreateNode(path, data)
@@ -152,16 +181,24 @@ func CreateNodeRecursion(path string, data []byte) {
 
 //创建临时节点
 func CreateOrUpdateEphemeralNode(path string, data []byte) bool {
-	if !ExistsNode(path) {
+	exists, err := ExistsNode(path)
+	if err != nil {
+		return false
+	}
+	if !exists {
 		return createZkNode(path, data, zk.FlagEphemeral)
 	} else {
 		return writeData(path, data)
 	}
 }
-func GetNodeWatcher(path string) <-chan zk.Event {
+func GetNodeWatcher(path string) (<-chan zk.Event, bool) {
 	_, _, watcher, err := zkConn.GetW(path)
 	checkError(err)
-	return watcher
+	if err != nil {
+		return watcher, false
+	} else {
+		return watcher, true
+	}
 }
 
 //递归删除节点，即：删除节点和其所有子节点，暂时只有测试用
@@ -192,6 +229,6 @@ func parentPath(path string) string {
 }
 func checkError(err error) {
 	if err != nil {
-		log.Fatalf("Get : %v", err)
+		log.Fatalf("zk操作时出现异常 : %v", err)
 	}
 }

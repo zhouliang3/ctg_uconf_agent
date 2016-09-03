@@ -2,20 +2,26 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"ctg.com/uconf-agent/app"
+	"ctg.com/uconf-agent/consts"
+	"ctg.com/uconf-agent/context"
 	"ctg.com/uconf-agent/fileutils"
 	"ctg.com/uconf-agent/host"
 	"ctg.com/uconf-agent/httpclient"
 	"ctg.com/uconf-agent/zkMgr"
+
 	"github.com/golang/glog"
 )
 
 var autoReload bool
+
+//0 表示连接上了 1 表示没连上
+var zkState int32
 
 func main() {
 	flag.Parse()
@@ -40,9 +46,7 @@ func main() {
 	//初始化zookeeper
 	servers := strings.Split(hosts, ",")
 	if autoReload {
-		if isConnected := zkMgr.InitZk(servers); isConnected {
-			zkMgr.CreateNode(prefix, []byte(machine.Ip))
-		}
+		zkMgr.InitZk(servers, ZkSateCallBack)
 	}
 	var stopSignal chan int = make(chan int, 1)
 	for _, item := range agentConfig.Apps {
@@ -57,28 +61,55 @@ func main() {
 			//获取配置文件在Zk的节点路径和实例的zk路径
 			fileZkPath, instanceZkPath := appInstanceNode(prefix, conf.Name, appIdentity)
 			//依次处理配置文件,在新的goroutine中处理
-			go dealFileItem(url, path, fileZkPath, instanceZkPath)
+			go func() {
+				ctx := context.NewRoutineContext(conf.Name, url, path, fileZkPath, instanceZkPath)
+				dealFileItem(ctx)
+			}()
 		}
 	}
 
 	<-stopSignal
 }
 
+func ZkSateCallBack(isConnected bool) {
+	if isConnected {
+		atomic.StoreInt32(&zkState, 1)
+	} else {
+		atomic.StoreInt32(&zkState, 0)
+	}
+}
 func fileDownloadUrl(serverAddr string, appIdentity *app.Identity, conf *fileutils.AppConfig) string {
 	return serverAddr + "?version=" + appIdentity.Version + "&app=" + appIdentity.AppName + "&env=" + appIdentity.Env + "&key=" + conf.Name + "&tenant=" + appIdentity.Tenant + "&type=file"
 }
 
 //处理配置文件，包含：下载配置文件，保存配置文件到指定目录，监听配置文件节点，创建Agent实例临时节点
-func dealFileItem(url, path, fileZkPath, instanceZkPath string) {
+func dealFileItem(ctx *context.RoutineContext) {
 	defer glog.Flush()
 
 	for {
-		data := downloadAndSave(url, path, fileZkPath, instanceZkPath)
+		data := downloadAndSave(ctx)
 		if autoReload { //配置更新是否需要重新下载
-			//先判断配置文件zk节点是否存在，不存在则抛出恐慌
-			checkFileNode(fileZkPath)
-			createOrUpdateInstNode(instanceZkPath, data)
-			watchFileNode(fileZkPath, instanceZkPath, data)
+			//先判断配置文件zk节点是否存在，或者zk服务器异常连不上
+			if atomic.LoadInt32(&zkState) == 1 { //zk连接是否正常，下面代码执行期间也可能出现zk断开的问题
+				exists, err := checkFileNode(ctx)
+				if err != nil {
+					break
+				}
+				if !exists {
+					break
+				}
+				//TODO 需要设计多次重试后仍然失败的策略
+				DoRetryCall(createOrUpdateInstNode, ctx, data, "调用创建实例临时节点方法失败!")
+				DoRetryCall(watchFileNode, ctx, data, "调用监听配置文件节点方法失败!")
+				break
+				//				createOrUpdateInstNode(ctx, data)
+				//				watchFileNode(ctx, nil)
+
+			} else {
+				//zk连接不上，暂时什么都不做
+				break
+			}
+
 		} else {
 			break
 		}
@@ -87,49 +118,68 @@ func dealFileItem(url, path, fileZkPath, instanceZkPath string) {
 }
 
 //创建实例临时节点
-func createOrUpdateInstNode(instanceZkPath string, data []byte) {
-	glog.Infof("开始创建Agent实例临时节点:%s", instanceZkPath)
-	zkMgr.CreateOrUpdateEphemeralNode(instanceZkPath, data)
-	glog.Infof("Agent实例临时节点创建成功:%s.\n", instanceZkPath)
+func createOrUpdateInstNode(ctx *context.RoutineContext, data []byte) bool {
+	glog.Infof("[Rtn%d]开始创建Agent实例临时节点:%s.", ctx.RoutineId, ctx.InstanceZkPath)
+	success := zkMgr.CreateOrUpdateEphemeralNode(ctx.InstanceZkPath, data)
+	if success {
+		glog.Infof("[Rtn%d]Agent实例临时节点创建成功:%s.\n", ctx.RoutineId, ctx.InstanceZkPath)
+	} else {
+		glog.Errorf("[Rtn%d]Agent实例临时节点创建失败:%s.\n", ctx.RoutineId, ctx.InstanceZkPath)
+	}
+	return success
+
 }
 
 //监听配置文件zk节点
-func watchFileNode(fileZkPath, instanceZkPath string, data []byte) {
-	glog.Infof("开始监听配置文件节点:%s.\n", fileZkPath)
+func watchFileNode(ctx *context.RoutineContext, data []byte) bool {
+	glog.Infof("[Rtn%d]开始监听配置文件节点:%s.\n", ctx.RoutineId, ctx.FileZkPath)
 	//监听配置文件的zk节点
 	for {
 		glog.Flush()
-		watcher := zkMgr.GetNodeWatcher(fileZkPath)
+		watcher, success := zkMgr.GetNodeWatcher(ctx.FileZkPath) //需要处理zk异常
+		if !success {
+			return false
+		}
 		event := <-watcher
-		glog.Infof("监听到节点%s发生[%s]事件", fileZkPath, event.Type.String())
+		glog.Infof("[Rtn%d]监听到节点%s发生[%s]事件.", ctx.RoutineId, ctx.FileZkPath, event.Type.String())
 		if zkMgr.IsDataChanged(event) {
-			glog.Infof("配置文件节点发生变化:%s,准备重新下载.", fileZkPath)
+			glog.Infof("[Rtn%d]配置文件节点发生变化:%s,准备重新下载.", ctx.RoutineId, ctx.FileZkPath)
 			break
 		}
 	}
+	return true
 }
 
 //下载配置文件并保存
-func downloadAndSave(url, path, fileZkPath, instanceZkPath string) []byte {
-	glog.Info("-----------------开始下载配置-----------------") //下载
-	fmt.Println(url)
-	data := httpclient.DownloadFromServer(url)
-	glog.Info("下载配置成功，开始保存文件")
-	glog.Infof("配置文件内容为:\n%s\n", string(data))
-	fileutils.WriteFile(path, data)
-	glog.Infof("配置文件已保存到:%s.", path)
+func downloadAndSave(ctx *context.RoutineContext) []byte {
+	glog.Infof("[Rtn%d]开始下载配置文件:%s", ctx.RoutineId, ctx.FileName) //下载
+	data := httpclient.DownloadFromServer(ctx.Url)
+	glog.Infof("[Rtn%d]下载配置文件%s成功，开始保存文件", ctx.RoutineId, ctx.FileName)
+	glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileName, string(data))
+	fileutils.WriteFile(ctx.Path, data)
+	glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.Path)
 
 	return data
 }
 
-//校验配置文件节点是否存在，不存在则抛出恐慌
-func checkFileNode(fileZkPath string) {
-	glog.Info("开始校验Zk上是否有配置信息.")
-	if !zkMgr.ExistsNode(fileZkPath) {
-		glog.Fatalf("配置文件节点:%s,不存在", fileZkPath)
-		panic("配置文件节点:" + fileZkPath + "不存在.")
+//校验配置文件节点是否存在
+func checkFileNode(ctx *context.RoutineContext) (bool, error) {
+	glog.Infof("[Rtn%d]开始校验Zk上是否存在配置文件节点:%s.", ctx.RoutineId, ctx.FileZkPath)
+	var isExists bool
+	var err error
+	if isExists, err = zkMgr.ExistsNode(ctx.FileZkPath); !isExists && err == nil {
+		glog.Fatalf("[Rtn%d]配置文件节点:%s,不存在.", ctx.RoutineId, ctx.FileZkPath)
+		return false, nil
+	} else {
+		if err != nil {
+			glog.Errorf("[Rtn%d]校验Zk上是否存在配置文件节点出现异常.", ctx.RoutineId)
+			return false, err
+		} else {
+			glog.Infof("[Rtn%d]校验成功,Zk上存在配置文件节点:%s.", ctx.RoutineId, ctx.FileZkPath)
+			return true, nil
+		}
 	}
-	glog.Info("开始校验Zk上有配置信息成功.")
+
 }
 
 // 获得实例保存到zk上的路径
@@ -148,4 +198,25 @@ func flushLog() {
 			glog.Flush()
 		}
 	}()
+}
+
+type UnreliableZkCaller func(ctx *context.RoutineContext, data []byte) bool
+
+//传入适配UnreliableZkCaller类型的方法；调用参数；超时信息，可进行失败重试
+func DoRetryCall(caller UnreliableZkCaller, ctx *context.RoutineContext, data []byte, timeoutMsg string) bool {
+	for i := 0; i < consts.UnreliableZkRetryTimes; i++ {
+		if !caller(ctx, data) {
+			retryRemainTimes := consts.UnreliableZkRetryTimes - (i + 1)
+			if retryRemainTimes > 0 {
+				glog.Errorf("%s，将在%d秒后将重试，剩余重试次数:%d", timeoutMsg, consts.UnreliableZkRetryGap/time.Second, retryRemainTimes)
+				time.Sleep(consts.UnreliableZkRetryGap)
+			} else {
+				glog.Errorf("%s，剩余重试次数:%d\n", timeoutMsg, retryRemainTimes)
+
+			}
+			continue
+		}
+		return true
+	}
+	return false
 }
