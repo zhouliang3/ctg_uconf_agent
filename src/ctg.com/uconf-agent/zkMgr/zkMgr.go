@@ -1,12 +1,15 @@
 package zkMgr
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"ctg.com/uconf-agent/consts"
+	"ctg.com/uconf-agent/context"
+	"ctg.com/uconf-agent/retryer"
 	"ctg.com/uconf-agent/strutils"
 	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
@@ -23,7 +26,10 @@ var recovering bool = false
 type StateCallback func(isConnected bool)
 
 var Callback StateCallback
-var ConnWaitList int32 = 0
+var ConnWaitCounter int32 = 0
+var mainContext *context.RoutineContext
+
+type NodeWatcher <-chan zk.Event
 
 //处理连接状态变更的回调函数
 func stateChangeCallback(event zk.Event) {
@@ -34,7 +40,7 @@ func stateChangeCallback(event zk.Event) {
 	if event.State == zk.StateHasSession {
 		glog.Info("与ZK服务器会话建立成功.")
 		Callback(true)
-		for ; atomic.LoadInt32(&ConnWaitList) > 0; atomic.AddInt32(&ConnWaitList, -1) {
+		for ; atomic.LoadInt32(&ConnWaitCounter) > 0; atomic.AddInt32(&ConnWaitCounter, -1) {
 			connectChn <- 1
 		}
 	}
@@ -67,34 +73,25 @@ func reconnect() {
 		connectLock.Unlock()
 	}()
 	recovering = true
-
-	for i := 0; ; i++ {
-		glog.Infof("尝试第%d次连接zk服务器.", i+1)
-		if connected := connect(); !connected {
-			glog.Errorf("尝试第%d次连接zk服务器失败.", i+1)
-			time.Sleep(consts.ZkConnectRetryGap)
-		} else {
-			glog.Infof("尝试第%d次连接zk服务器成功.", i+1)
-			break
-		}
-	}
+	endlessRetry := retryer.NewEndlessRetryer(consts.ZkConnectRetryGap)
+	endlessRetry.DoRetry(Connect, mainContext)
 }
 
 //连接zk的方法，不暴露
-func connect() bool {
+func Connect(ctx *context.RoutineContext) *context.OutputContext {
 	var err error
 	zkConn, _, err = zk.Connect(servers, time.Minute, zk.WithEventCallback(stateChangeCallback))
 	checkError("与Zk服务器建立连接时，出现异常.", err)
-	atomic.AddInt32(&ConnWaitList, 1)
+	atomic.AddInt32(&ConnWaitCounter, 1)
 	select {
 	case <-connectChn:
 		glog.Info("与zk服务器建立连接成功.")
-		return true
+		return context.NewSuccessOutputContext(nil)
 	case <-time.After(consts.ZkConnectTimeOut):
 		glog.Errorln("与zk服务器建立连接超时.")
 		//关闭连接，会触发StateDisconnected事件，然后在callback中进行reconnect
 		zkConn.Close()
-		return false
+		return context.NewErrorOutputContext(errors.New("与zk服务器建立连接超时"))
 	}
 }
 
@@ -124,13 +121,17 @@ func ExistsNode(path string) (bool, error) {
 }
 
 //初始化Zk连接
-func InitZk(servs []string, sc StateCallback) bool {
-	glog.Info("开始建立Zk连接.")
+func InitZk(ctx *context.RoutineContext, servs []string, sc StateCallback) bool {
+	glog.Infof("[Rtn%d]开始建立Zk连接.", ctx.RoutineId)
 	servers = servs
 	Callback = sc
-	isConnected := connect()
-	glog.Info("成功建立Zk连接.")
-	return isConnected
+	mainContext = ctx
+	output := Connect(ctx)
+	if output.Err == nil {
+		glog.Infof("[Rtn%d]成功建立Zk连接.", ctx.RoutineId)
+		return true
+	}
+	return false
 }
 
 func writeData(path string, data []byte) bool {
@@ -201,7 +202,7 @@ func CreateOrUpdateEphemeralNode(path string, data []byte) bool {
 		return writeData(path, data)
 	}
 }
-func GetNodeWatcher(path string) (<-chan zk.Event, bool) {
+func GetNodeWatcher(path string) (NodeWatcher, bool) {
 	_, _, watcher, err := zkConn.GetW(path)
 	checkError("调用获取zk节点的watcher出现异常", err)
 	if err != nil {

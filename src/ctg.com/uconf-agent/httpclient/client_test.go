@@ -1,29 +1,34 @@
 package httpclient
 
 import (
-	"fmt"
-	"sort"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	//	"ctg.com/uconf-agent/consts"
 	"ctg.com/uconf-agent/context"
 )
 
-type UnreliableCaller func(a, b, c string) bool
-
-func DoRequest(a, b, c string) bool {
-	fmt.Printf("a:%s\nb:%s\nc:%s\n", a, b, c)
-	return false
+func TestSomething(t *testing.T) {
 }
 
-func Retry(caller UnreliableCaller, a, b, c string) bool {
-	for i := 0; i < 3; i++ {
-		if !caller(a, b, c) {
+type Retryer interface {
+	doRetry(caller UnreliableCaller, ctx *context.RoutineContext, timeoutMsg string) *OutputContext
+}
+type RoundRobinRetryer struct {
+	RetryTimes int
+	RetryGap   time.Duration
+}
 
-			fmt.Println("重试")
-			time.Sleep(time.Second * 3)
+func (retryer RoundRobinRetryer) doRetry(caller UnreliableCaller, ctx *context.RoutineContext, msg string) *OutputContext {
+	for i := 0; i < retryer.RetryTimes; i++ {
+		if !caller(ctx) {
+			retryRemainTimes := retryer.RetryTimes - (i + 1)
+			if retryRemainTimes > 0 {
+				glog.Errorf("[Rtn%d]%s，将在%d秒后将重试，剩余重试次数:%d", ctx.RoutineId, msg, retryer.RetryGap/time.Second, retryRemainTimes)
+				time.Sleep(retryer.RetryGap)
+			} else {
+				glog.Errorf("[Rtn%d]%s，剩余重试次数:%d\n", ctx.RoutineId, msg, retryRemainTimes)
+
+			}
 			continue
 		}
 		return true
@@ -31,16 +36,4 @@ func Retry(caller UnreliableCaller, a, b, c string) bool {
 	return false
 }
 
-func TestSomething(t *testing.T) {
-	//DoRetryCall(ACall, &context.RoutineContext{}, nil, "充实各县")
-}
-
-type UnreliableZkCaller func(ctx *context.RoutineContext, data []byte) bool
-
-func ACall(ctx *context.RoutineContext, data []byte) bool {
-	fmt.Println("Acalled")
-	return false
-}
-
-func TestGet(t *testing.T) {
-}
+type UnreliableCaller func(ctx *context.RoutineContext) *context.OutputContext
