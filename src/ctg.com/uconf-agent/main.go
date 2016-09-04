@@ -4,6 +4,7 @@ import (
 	"flag"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 
 var autoReload bool
 
-//0 表示连接上了 1 表示没连上
+//TODO 1 表示连接上了 0 表示没连上
 var zkState int32
 
 func main() {
@@ -31,21 +32,55 @@ func main() {
 	//解析配置agent文件
 	agentConfig := fileutils.Read()
 	autoReload = agentConfig.Enabled
-	//调用RESTful API获取zk配置
+	//获取RESTful API的url地址
 	zooAction, fileAction := agentConfig.Server.ServerActionAddress()
-	zooHostsUrl := zooAction + "/" + "hosts"
-	zooPrefixUrl := zooAction + "/" + "prefix"
-	hostsResponseMap := httpclient.GetValueFromServer(zooHostsUrl)
-	hosts := hostsResponseMap["value"].(string)
-	glog.Info("zk服务器地址列表:", hosts)
-	prefixResponseMap := httpclient.GetValueFromServer(zooPrefixUrl)
-	prefix := prefixResponseMap["value"].(string)
-	glog.Info("zk根路径:", prefix)
 	//获取机器信息
 	machine := host.Info(agentConfig.Server.Ip + ":" + agentConfig.Server.Port)
 	//初始化zookeeper
-	servers := strings.Split(hosts, ",")
-	if autoReload {
+	var prefix string
+	if autoReload { //需要连接zk,那么就必须等获取到zk连接信息之后才继续下面的动作
+		zooHostsUrl := zooAction + "/" + "hosts"
+		zooPrefixUrl := zooAction + "/" + "prefix"
+		var hostsResponseMap map[string]interface{}
+		var prefixResponseMap map[string]interface{}
+		var latch sync.WaitGroup
+		latch.Add(2)
+		go func() {
+			for {
+				var err error
+				hostsResponseMap, err = httpclient.GetValueFromServer(zooHostsUrl)
+				if err != nil {
+					glog.Errorf("获取zk服务器地址列表失败，将在%d秒后重试.", consts.ZooServerInfoRetryGap/time.Second)
+					time.Sleep(consts.ZooServerInfoRetryGap)
+				} else {
+					glog.Info("获取zk服务器地址列表成功.")
+					break
+				}
+			}
+			latch.Done()
+		}()
+		go func() {
+			for {
+				var err error
+				prefixResponseMap, err = httpclient.GetValueFromServer(zooPrefixUrl)
+				if err != nil {
+					glog.Errorf("获取zk根路径失败，将在%d秒后重试.", consts.ZooServerInfoRetryGap/time.Second)
+					time.Sleep(consts.ZooServerInfoRetryGap)
+				} else {
+					glog.Info("获取zk根路径成功.")
+
+					break
+				}
+			}
+			latch.Done()
+		}()
+		//等待获取zk信息
+		latch.Wait()
+		hosts := hostsResponseMap["value"].(string)
+		glog.Info("zk服务器地址列表:", hosts)
+		prefix = prefixResponseMap["value"].(string)
+		glog.Info("zk根路径:", prefix)
+		servers := strings.Split(hosts, ",")
 		zkMgr.InitZk(servers, ZkSateCallBack)
 	}
 	var stopSignal chan int = make(chan int, 1)
@@ -87,7 +122,7 @@ func dealFileItem(ctx *context.RoutineContext) {
 	defer glog.Flush()
 
 	for {
-		data := downloadAndSave(ctx)
+		data, success := downloadAndSave(ctx)
 		if autoReload { //配置更新是否需要重新下载
 			//先判断配置文件zk节点是否存在，或者zk服务器异常连不上
 			if atomic.LoadInt32(&zkState) == 1 { //zk连接是否正常，下面代码执行期间也可能出现zk断开的问题
@@ -99,8 +134,14 @@ func dealFileItem(ctx *context.RoutineContext) {
 					break
 				}
 				//TODO 需要设计多次重试后仍然失败的策略
-				DoRetryCall(createOrUpdateInstNode, ctx, data, "调用创建实例临时节点方法失败!")
-				DoRetryCall(watchFileNode, ctx, data, "调用监听配置文件节点方法失败!")
+				if success {
+					ctx.Data = data
+					created := DoRetryCall(createOrUpdateInstNode, ctx, "调用创建实例临时节点方法失败!")
+					if created {
+						ctx.Data = nil
+					}
+				}
+				DoRetryCall(watchFileNode, ctx, "调用监听配置文件节点方法失败!")
 				break
 				//				createOrUpdateInstNode(ctx, data)
 				//				watchFileNode(ctx, nil)
@@ -118,9 +159,9 @@ func dealFileItem(ctx *context.RoutineContext) {
 }
 
 //创建实例临时节点
-func createOrUpdateInstNode(ctx *context.RoutineContext, data []byte) bool {
+func createOrUpdateInstNode(ctx *context.RoutineContext) bool {
 	glog.Infof("[Rtn%d]开始创建Agent实例临时节点:%s.", ctx.RoutineId, ctx.InstanceZkPath)
-	success := zkMgr.CreateOrUpdateEphemeralNode(ctx.InstanceZkPath, data)
+	success := zkMgr.CreateOrUpdateEphemeralNode(ctx.InstanceZkPath, ctx.Data)
 	if success {
 		glog.Infof("[Rtn%d]Agent实例临时节点创建成功:%s.\n", ctx.RoutineId, ctx.InstanceZkPath)
 	} else {
@@ -131,7 +172,7 @@ func createOrUpdateInstNode(ctx *context.RoutineContext, data []byte) bool {
 }
 
 //监听配置文件zk节点
-func watchFileNode(ctx *context.RoutineContext, data []byte) bool {
+func watchFileNode(ctx *context.RoutineContext) bool {
 	glog.Infof("[Rtn%d]开始监听配置文件节点:%s.\n", ctx.RoutineId, ctx.FileZkPath)
 	//监听配置文件的zk节点
 	for {
@@ -151,15 +192,20 @@ func watchFileNode(ctx *context.RoutineContext, data []byte) bool {
 }
 
 //下载配置文件并保存
-func downloadAndSave(ctx *context.RoutineContext) []byte {
+func downloadAndSave(ctx *context.RoutineContext) ([]byte, bool) {
 	glog.Infof("[Rtn%d]开始下载配置文件:%s", ctx.RoutineId, ctx.FileName) //下载
-	data := httpclient.DownloadFromServer(ctx.Url)
-	glog.Infof("[Rtn%d]下载配置文件%s成功，开始保存文件", ctx.RoutineId, ctx.FileName)
-	glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileName, string(data))
-	fileutils.WriteFile(ctx.Path, data)
-	glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.Path)
+	data, success := httpclient.DownloadFromServer(ctx.Url)
+	if success {
+		glog.Infof("[Rtn%d]下载配置文件%s成功，开始保存文件", ctx.RoutineId, ctx.FileName)
+		glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileName, string(data))
+		fileutils.WriteFile(ctx.Path, data)
+		glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.Path)
+	} else {
+		glog.Infof("[Rtn%d]下载配置文件%s失败!", ctx.RoutineId)
+		return nil, false //下载失败返回一个空的字符串
+	}
+	return data, success
 
-	return data
 }
 
 //校验配置文件节点是否存在
@@ -200,18 +246,18 @@ func flushLog() {
 	}()
 }
 
-type UnreliableZkCaller func(ctx *context.RoutineContext, data []byte) bool
+type UnreliableZkCaller func(ctx *context.RoutineContext) bool
 
 //传入适配UnreliableZkCaller类型的方法；调用参数；超时信息，可进行失败重试
-func DoRetryCall(caller UnreliableZkCaller, ctx *context.RoutineContext, data []byte, timeoutMsg string) bool {
+func DoRetryCall(caller UnreliableZkCaller, ctx *context.RoutineContext, timeoutMsg string) bool {
 	for i := 0; i < consts.UnreliableZkRetryTimes; i++ {
-		if !caller(ctx, data) {
+		if !caller(ctx) {
 			retryRemainTimes := consts.UnreliableZkRetryTimes - (i + 1)
 			if retryRemainTimes > 0 {
-				glog.Errorf("%s，将在%d秒后将重试，剩余重试次数:%d", timeoutMsg, consts.UnreliableZkRetryGap/time.Second, retryRemainTimes)
+				glog.Errorf("[Rtn%d]%s，将在%d秒后将重试，剩余重试次数:%d", ctx.RoutineId, timeoutMsg, consts.UnreliableZkRetryGap/time.Second, retryRemainTimes)
 				time.Sleep(consts.UnreliableZkRetryGap)
 			} else {
-				glog.Errorf("%s，剩余重试次数:%d\n", timeoutMsg, retryRemainTimes)
+				glog.Errorf("[Rtn%d]%s，剩余重试次数:%d\n", ctx.RoutineId, timeoutMsg, retryRemainTimes)
 
 			}
 			continue

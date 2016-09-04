@@ -1,9 +1,9 @@
 package zkMgr
 
 import (
-	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"ctg.com/uconf-agent/consts"
@@ -23,6 +23,7 @@ var recovering bool = false
 type StateCallback func(isConnected bool)
 
 var Callback StateCallback
+var ConnWaitList int32 = 0
 
 //处理连接状态变更的回调函数
 func stateChangeCallback(event zk.Event) {
@@ -33,7 +34,9 @@ func stateChangeCallback(event zk.Event) {
 	if event.State == zk.StateHasSession {
 		glog.Info("与ZK服务器会话建立成功.")
 		Callback(true)
-		connectChn <- 1
+		for ; atomic.LoadInt32(&ConnWaitList) > 0; atomic.AddInt32(&ConnWaitList, -1) {
+			connectChn <- 1
+		}
 	}
 	if event.State == zk.StateDisconnected {
 		//这是由于网络不通或服务器没启动等原因造成的
@@ -52,6 +55,7 @@ func stateChangeCallback(event zk.Event) {
 	}
 	if event.State == zk.StateAuthFailed {
 		glog.Errorln("Zk鉴权失败.")
+		Callback(false)
 	}
 }
 
@@ -70,6 +74,7 @@ func reconnect() {
 			glog.Errorf("尝试第%d次连接zk服务器失败.", i+1)
 			time.Sleep(consts.ZkConnectRetryGap)
 		} else {
+			glog.Infof("尝试第%d次连接zk服务器成功.", i+1)
 			break
 		}
 	}
@@ -79,13 +84,14 @@ func reconnect() {
 func connect() bool {
 	var err error
 	zkConn, _, err = zk.Connect(servers, time.Minute, zk.WithEventCallback(stateChangeCallback))
-	checkError(err)
+	checkError("与Zk服务器建立连接时，出现异常.", err)
+	atomic.AddInt32(&ConnWaitList, 1)
 	select {
 	case <-connectChn:
 		glog.Info("与zk服务器建立连接成功.")
 		return true
 	case <-time.After(consts.ZkConnectTimeOut):
-		glog.Errorln("与zk服务器连接连接超时.")
+		glog.Errorln("与zk服务器建立连接超时.")
 		//关闭连接，会触发StateDisconnected事件，然后在callback中进行reconnect
 		zkConn.Close()
 		return false
@@ -101,9 +107,13 @@ func ExistsNode(path string) (bool, error) {
 		if err != nil {
 			rErr = err
 			retryRemainTimes := consts.ZkCallerRetryTimes - (i + 1)
-			checkError(err)
-			log.Printf("调用zk接口判断节点%s是否存在时，出现异常，将在%d秒后将重试，剩余重试次数:%d", path, consts.ZkCallerRetryGap/time.Second, retryRemainTimes)
-			time.Sleep(consts.ZkCallerRetryGap)
+			if retryRemainTimes > 0 {
+				glog.Errorf("调用zk接口判断节点%s是否存在时，出现异常，将在%d秒后将重试，剩余重试次数:%d.", path, consts.ZkCallerRetryGap/time.Second, retryRemainTimes)
+				time.Sleep(consts.ZkCallerRetryGap)
+			} else {
+				glog.Errorf("调用zk接口判断节点%s是否存在时，出现异常，剩余重试次数:%d.", path, retryRemainTimes)
+			}
+
 			continue
 		} else {
 			return exists, nil
@@ -133,7 +143,7 @@ func writeData(path string, data []byte) bool {
 	} else {
 		_, err := zkConn.Set(path, []byte(data), -1)
 		if err != nil {
-			glog.Errorf("write data to s% err v% ", path, err)
+			glog.Errorf("将数据写入zk节点: s% , 出现异常: v%.", path, err)
 			return false
 		}
 	}
@@ -152,7 +162,7 @@ func createZkNode(path string, data []byte, flags int32) bool {
 	if !exists {
 		_, err := zkConn.Create(path, data, flags, zk.WorldACL(zk.PermAll))
 		if err != nil {
-			glog.Errorf("create node s% err v% ", path, err)
+			glog.Errorf("创建zk节点: s%,出现异常: v%.", path, err)
 			return false
 		}
 	}
@@ -193,7 +203,7 @@ func CreateOrUpdateEphemeralNode(path string, data []byte) bool {
 }
 func GetNodeWatcher(path string) (<-chan zk.Event, bool) {
 	_, _, watcher, err := zkConn.GetW(path)
-	checkError(err)
+	checkError("调用获取zk节点的watcher出现异常", err)
 	if err != nil {
 		return watcher, false
 	} else {
@@ -227,8 +237,8 @@ func parentPath(path string) string {
 	parentPath := strutils.Substring(path, 0, i)
 	return parentPath
 }
-func checkError(err error) {
+func checkError(errMsg string, err error) {
 	if err != nil {
-		log.Fatalf("zk操作时出现异常 : %v", err)
+		glog.Errorf("%s : %v", errMsg, err)
 	}
 }

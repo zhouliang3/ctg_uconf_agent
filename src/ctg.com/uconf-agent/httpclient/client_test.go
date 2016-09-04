@@ -2,10 +2,12 @@ package httpclient
 
 import (
 	"fmt"
+	"sort"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"ctg.com/uconf-agent/consts"
+	//	"ctg.com/uconf-agent/consts"
 	"ctg.com/uconf-agent/context"
 )
 
@@ -30,7 +32,7 @@ func Retry(caller UnreliableCaller, a, b, c string) bool {
 }
 
 func TestSomething(t *testing.T) {
-	DoRetryCall(ACall, &context.RoutineContext{}, nil, "充实各县")
+	//DoRetryCall(ACall, &context.RoutineContext{}, nil, "充实各县")
 }
 
 type UnreliableZkCaller func(ctx *context.RoutineContext, data []byte) bool
@@ -40,21 +42,5 @@ func ACall(ctx *context.RoutineContext, data []byte) bool {
 	return false
 }
 
-//传入适配UnreliableZkCaller类型的方法；调用参数；超时信息，可进行失败重试的调用
-func DoRetryCall(caller UnreliableZkCaller, ctx *context.RoutineContext, data []byte, timeoutMsg string) bool {
-	for i := 0; i < consts.UnreliableZkRetryTimes; i++ {
-		if !caller(ctx, data) {
-			retryRemainTimes := consts.UnreliableZkRetryTimes - (i + 1)
-			if retryRemainTimes > 0 {
-				fmt.Printf("%s，将在%d秒后将重试，剩余重试次数:%d\n", timeoutMsg, consts.UnreliableZkRetryGap/time.Second, retryRemainTimes)
-				time.Sleep(consts.UnreliableZkRetryGap)
-			} else {
-				fmt.Printf("%s，剩余重试次数:%d\n", timeoutMsg, retryRemainTimes)
-
-			}
-			continue
-		}
-		return true
-	}
-	return false
+func TestGet(t *testing.T) {
 }
