@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"ctg.com/uconf-agent/consts"
 	"ctg.com/uconf-agent/context"
 	"ctg.com/uconf-agent/retryer"
 	"github.com/golang/glog"
@@ -43,8 +42,8 @@ func Get(ctx *context.RoutineContext) *context.OutputContext {
 //发送Rest请求，解析返回的json格式数据
 func GetValueFromServer(url string) (map[string]interface{}, error) {
 	ctx := context.NewRequestRoutineContext(url, nil)
-	roundRobinRetryer := retryer.NewRoundRobinRetryer(consts.UnreliableHttpRetryTimes, consts.UnreliableHttpRetryGap)
-	output := roundRobinRetryer.DoRetry(Get, ctx)
+	httpRetryer := retryer.HttpRequestRetryer()
+	output := httpRetryer.DoRetry(Get, ctx)
 	if output.Err != nil {
 		return nil, errors.New("获取Json数据异常")
 	}
@@ -68,8 +67,8 @@ func DownloadFromServer(url string) ([]byte, bool) {
 	headers["Accept-Language"] = "en-US,en;q=0.5"
 	headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 	ctx := context.NewRequestRoutineContext(url, headers)
-	roundRobinRetryer := retryer.NewRoundRobinRetryer(consts.UnreliableHttpRetryTimes, consts.UnreliableHttpRetryGap)
-	output := roundRobinRetryer.DoRetry(Get, ctx)
+	httpRetryer := retryer.HttpRequestRetryer()
+	output := httpRetryer.DoRetry(Get, ctx)
 	if output.Err != nil {
 		return nil, false
 	}

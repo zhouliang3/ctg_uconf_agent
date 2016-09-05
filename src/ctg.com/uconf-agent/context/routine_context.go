@@ -7,6 +7,7 @@ import (
 
 var idx int32 = 0
 
+//RoutineContext是一个大而全的上下文结构体，目前程序中都是通过指针传递，对资源的消耗很小。
 type RoutineContext struct {
 	FileContext    *FileContext
 	RoutineId      int32

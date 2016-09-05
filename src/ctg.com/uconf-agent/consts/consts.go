@@ -4,6 +4,9 @@ import (
 	"time"
 )
 
+//每过多久将日志刷到文件中去
+const LogFlushGap = time.Second * 5
+
 //agent配置文件名称
 const AgentYamlFileName string = "uconf.yml"
 

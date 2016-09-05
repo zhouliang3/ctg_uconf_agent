@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"ctg.com/uconf-agent/consts"
 	"ctg.com/uconf-agent/context"
 	"github.com/golang/glog"
 )
@@ -21,11 +22,24 @@ type RoundRobinRetryer struct {
 	RetryGap   time.Duration
 }
 
-func NewRoundRobinRetryer(retryTimes int, retryGap time.Duration) *RoundRobinRetryer {
+func NewRoundRobinRetryer(retryTimes int, retryGap time.Duration) RoundRobinRetryer {
 	if retryGap < MinRetryGap {
 		retryGap = MinRetryGap
 	}
-	return &RoundRobinRetryer{retryTimes, retryGap}
+	return RoundRobinRetryer{retryTimes, retryGap}
+}
+
+var zkRetryer Retryer = NewRoundRobinRetryer(consts.UnreliableZkRetryTimes, consts.UnreliableZkRetryGap)
+
+//zk的请求重试机制
+func ZkRequestRetryer() Retryer {
+	return zkRetryer
+}
+
+var httpRetryer Retryer = NewRoundRobinRetryer(consts.UnreliableHttpRetryTimes, consts.UnreliableHttpRetryGap)
+
+func HttpRequestRetryer() Retryer {
+	return httpRetryer
 }
 
 //重试RetryTimes次caller方法
@@ -54,11 +68,11 @@ type EndlessRetryer struct {
 	RetryGap time.Duration
 }
 
-func NewEndlessRetryer(retryGap time.Duration) *EndlessRetryer {
+func NewEndlessRetryer(retryGap time.Duration) EndlessRetryer {
 	if retryGap < MinRetryGap {
 		retryGap = MinRetryGap
 	}
-	return &EndlessRetryer{retryGap}
+	return EndlessRetryer{retryGap}
 }
 
 //无限次数的重试caller对应的方法
@@ -75,6 +89,18 @@ func (retryer EndlessRetryer) DoRetry(caller UnreliableCaller, ctx *context.Rout
 		return output
 	}
 	return lastOutput
+}
+
+type NoneRetryer struct {
+}
+
+func NewNoneRetryer() NoneRetryer {
+	return NoneRetryer{}
+}
+
+//不重试，快速失败
+func (retryer NoneRetryer) DoRetry(caller UnreliableCaller, ctx *context.RoutineContext) *context.OutputContext {
+	return caller(ctx)
 }
 
 func retryGapConversion(retryGap time.Duration) string {

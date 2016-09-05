@@ -17,7 +17,7 @@ func ZooInfo(zooAction string) ([]string, string) {
 	var prefixResponseMap map[string]interface{}
 	var latch sync.WaitGroup
 	latch.Add(2)
-	//无限次数的重试
+	//无限次数的重试,因FetchZooPrefix的请求的http方法本身具有重试机制，这里做重试是为了缓解服务端请求压力，重试时间间隔设置到分钟级
 	endlessRetry := retryer.NewEndlessRetryer(consts.ZooServerInfoRetryGap)
 	go func() {
 		ctx := context.NewZooActionMetaContext(zooActionMeta)

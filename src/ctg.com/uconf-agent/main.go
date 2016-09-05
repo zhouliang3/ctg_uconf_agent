@@ -19,7 +19,7 @@ import (
 
 var autoReload bool
 
-//TODO 1 表示连接上了 0 表示没连上
+// 1 表示连接上了 0 表示没连上
 var zkState int32
 var MainRoutineContext *context.RoutineContext
 
@@ -94,11 +94,10 @@ func dealFileItem(ctx *context.RoutineContext) {
 				if !exists {
 					break
 				}
-				//TODO 需要设计多次重试后仍然失败的策略
 				if success {
 					ctx.FileContext.Data = data
-					roundRobinRetry := retryer.NewRoundRobinRetryer(consts.UnreliableZkRetryTimes, consts.UnreliableZkRetryGap)
-					output := roundRobinRetry.DoRetry(CreateOrUpdateInstNode, ctx)
+					zkRetryer := retryer.ZkRequestRetryer()
+					output := zkRetryer.DoRetry(CreateOrUpdateInstNode, ctx)
 					if output.Err == nil {
 						ctx.FileContext.Data = nil
 					} else { //TODO 重试多次依然失败暂时无策略
@@ -186,21 +185,29 @@ func downloadAndSave(ctx *context.RoutineContext) ([]byte, bool) {
 //校验配置文件节点是否存在
 func checkFileNode(ctx *context.RoutineContext) (bool, error) {
 	glog.Infof("[Rtn%d]开始校验Zk上是否存在配置文件节点:%s.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-	var isExists bool
-	var err error
-	if isExists, err = zkMgr.ExistsNode(ctx.FileContext.FileZkPath); !isExists && err == nil {
+
+	zkRetryer := retryer.ZkRequestRetryer()
+	output := zkRetryer.DoRetry(NodeExists, ctx)
+	if exists, ok := output.Result.(bool); ok {
+		return exists, output.Err
+	} else { //这种情形不会存在
+		glog.Errorf("[Rtn%d]调用Zk节点是否存在接口返回值类型异常", ctx.RoutineId)
+		return false, output.Err
+	}
+}
+func NodeExists(ctx *context.RoutineContext) *context.OutputContext {
+	if isExists, err := zkMgr.ExistsNode(ctx.FileContext.FileZkPath); !isExists && err == nil {
 		glog.Fatalf("[Rtn%d]配置文件节点:%s,不存在.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-		return false, nil
+		return context.NewSuccessOutputContext(false) //配置文件不存在,说明调用成功，返回false，err为nil
 	} else {
 		if err != nil {
 			glog.Errorf("[Rtn%d]校验Zk上是否存在配置文件节点出现异常.", ctx.RoutineId)
-			return false, err
+			return context.NewErrorOutputContext(err)
 		} else {
 			glog.Infof("[Rtn%d]校验成功,Zk上存在配置文件节点:%s.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-			return true, nil
+			return context.NewSuccessOutputContext(true)
 		}
 	}
-
 }
 
 // 获得实例保存到zk上的路径
@@ -212,7 +219,7 @@ func appInstanceNode(prefix, filename string, app *app.Identity) (string, string
 
 //定时将日志刷到文件中
 func flushLog() {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(consts.LogFlushGap)
 	go func() {
 		for t := range ticker.C {
 			t.Year()

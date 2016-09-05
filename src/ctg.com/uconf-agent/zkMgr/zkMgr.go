@@ -95,29 +95,10 @@ func Connect(ctx *context.RoutineContext) *context.OutputContext {
 	}
 }
 
-//判断节点是否存在
+//判断节点是否存在,zk层的判断存在方法暂时不采用重试机制，有业务层自己封装进行重试
 func ExistsNode(path string) (bool, error) {
-	//glog.Info("path is ", path)
-	var rErr error
-	for i := 0; i < consts.ZkCallerRetryTimes; i++ {
-		exists, _, err := zkConn.Exists(path)
-		if err != nil {
-			rErr = err
-			retryRemainTimes := consts.ZkCallerRetryTimes - (i + 1)
-			if retryRemainTimes > 0 {
-				glog.Errorf("调用zk接口判断节点%s是否存在时，出现异常，将在%d秒后将重试，剩余重试次数:%d.", path, consts.ZkCallerRetryGap/time.Second, retryRemainTimes)
-				time.Sleep(consts.ZkCallerRetryGap)
-			} else {
-				glog.Errorf("调用zk接口判断节点%s是否存在时，出现异常，剩余重试次数:%d.", path, retryRemainTimes)
-			}
-
-			continue
-		} else {
-			return exists, nil
-		}
-	}
-	return false, rErr
-
+	exists, _, err := zkConn.Exists(path)
+	return exists, err
 }
 
 //初始化Zk连接
@@ -170,26 +151,6 @@ func createZkNode(path string, data []byte, flags int32) bool {
 	return true
 }
 
-//递归创建节点，即：如果父节点不存在，先创建父节点
-func CreateNodeRecursion(path string, data []byte) {
-	exists, err := ExistsNode(path)
-	if err != nil {
-		return
-	}
-	if exists {
-		return
-	}
-	pp := parentPath(path)
-	exists, err = ExistsNode(pp)
-	if err != nil {
-		return
-	}
-	if !exists {
-		CreateNodeRecursion(pp, []byte(""))
-	}
-	CreateNode(path, data)
-}
-
 //创建临时节点
 func CreateOrUpdateEphemeralNode(path string, data []byte) bool {
 	exists, err := ExistsNode(path)
@@ -210,21 +171,6 @@ func GetNodeWatcher(path string) (NodeWatcher, bool) {
 	} else {
 		return watcher, true
 	}
-}
-
-//递归删除节点，即：删除节点和其所有子节点，暂时只有测试用
-func deleteNodeRecursion(path string) {
-	_, stat, _ := zkConn.Get(path)
-	if stat.NumChildren > 0 {
-		children, _, _ := zkConn.Children(path)
-		for _, child := range children {
-			childPath := path + "/" + child
-			deleteNodeRecursion(childPath)
-		}
-	}
-	//	glog.Info(path)
-
-	zkConn.Delete(path, -1)
 }
 
 //判断是否是节点数据变更事件
