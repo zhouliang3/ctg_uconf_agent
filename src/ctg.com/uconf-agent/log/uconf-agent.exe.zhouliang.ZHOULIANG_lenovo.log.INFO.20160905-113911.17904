@@ -1,0 +1,72 @@
+Log file created at: 2016/09/05 11:39:11
+Running on machine: zhouliang
+Binary: Built with gc go1.6 for windows/amd64
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I0905 11:39:11.349449   17904 yamlUitls.go:74] 开始读取Agent配置文件C:\Home\ffcs\jymjkj\ctg-uconf\ctg-uconf-agent\src\ctg.com\uconf-agent\conf\uconf.yml
+I0905 11:39:11.351451   17904 yamlUitls.go:86] 成功读取Agent配置文件,配置内容如下:
+enabled: true						#是否监听配置变化
+server:
+ ip: 10.142.90.23					#10.142.90.23 服务端Ip
+ port: 8082							#服务端port
+ context: uconf-web					#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+apps:								#本地应用数组
+- name: uconf_demo					#应用名称
+  tenant: fj						#应用所属租户
+  version: 1_0_0_0					#应用版本
+  env: rd							#应用环境类型(rd：开发环境)
+  tmpdir: e:\uconf_demo\tmp			#配置临时存储目录(暂时没用到，可以去了)
+  appdir: e:\uconf_demo				#应用根目录
+  configs:							#应用所有配置文件数组
+  - name: remote.properties			#配置文件名称
+    dir: conf						#配置文件相对应用根目录的路径
+  - name: redis.properties			#这是另外一份配置文件的信息
+    dir: conf
+#- name: crm_1.0					#这是另外一个应用
+#  tenant: fj
+#  version: 1_0_0_0
+#  env: rd
+#  tmpdir: /tmp/crm/conf
+#  appdir: /home/app/crm
+#  configs:
+#  - name: redis.properties
+#    dir: /home/app/crm/conf    
+#  - name: mq.properties
+#    dir: /home/app/crm/conf
+I0905 11:39:11.351451   17904 yamlUitls.go:57] 开始解析Agent配置文件:uconf.yml.
+I0905 11:39:11.351451   17904 yamlUitls.go:63] 成功解析Agent配置文件.
+I0905 11:39:11.502274   17904 Zoo_info.go:36] [Rtn2]获取zk根路径成功.
+I0905 11:39:11.502274   17904 Zoo_info.go:27] [Rtn3]获取zk服务器地址列表成功.
+I0905 11:39:11.502274   17904 Zoo_info.go:43] zk服务器地址列表:10.142.90.23:8181
+I0905 11:39:11.502274   17904 Zoo_info.go:45] zk根路径:/uconf
+I0905 11:39:11.502274   17904 zkMgr.go:106] [Rtn1]开始建立Zk连接.
+I0905 11:39:11.502774   17904 zkMgr.go:39] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 10.142.90.23:8181}].
+I0905 11:39:11.569848   17904 zkMgr.go:39] 监听到Zk连接状态变更事件[{EventSession StateConnected  <nil> 10.142.90.23:8181}].
+I0905 11:39:11.638983   17904 zkMgr.go:39] 监听到Zk连接状态变更事件[{EventSession StateHasSession  <nil> 10.142.90.23:8181}].
+I0905 11:39:11.638983   17904 zkMgr.go:41] 与ZK服务器会话建立成功.
+I0905 11:39:11.638983   17904 zkMgr.go:88] 与zk服务器建立连接成功.
+I0905 11:39:11.638983   17904 zkMgr.go:112] [Rtn1]成功建立Zk连接.
+I0905 11:39:11.639903   17904 main.go:169] [Rtn6]开始下载配置文件:redis.properties
+I0905 11:39:11.639903   17904 main.go:169] [Rtn8]开始下载配置文件:redis.properties
+I0905 11:39:11.728493   17904 main.go:172] [Rtn6]下载配置文件redis.properties成功.
+I0905 11:39:11.728493   17904 main.go:173] [Rtn6]配置文件redis.properties内容为:
+redis.host=127.0.0.1
+
+redis.port=1236
+I0905 11:39:11.728493   17904 main.go:172] [Rtn8]下载配置文件redis.properties成功.
+I0905 11:39:11.728493   17904 main.go:174] [Rtn6]开始保存配置文件redis.properties.
+I0905 11:39:11.728493   17904 main.go:173] [Rtn8]配置文件redis.properties内容为:
+remoteHost=127.0.0.12
+remotePort=8081
+I0905 11:39:11.728493   17904 main.go:174] [Rtn8]开始保存配置文件redis.properties.
+I0905 11:39:11.729499   17904 main.go:176] [Rtn8]配置文件已保存到:e:\uconf_demo\conf\remote.properties.
+I0905 11:39:11.729499   17904 main.go:187] [Rtn8]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0905 11:39:11.730494   17904 main.go:176] [Rtn6]配置文件已保存到:e:\uconf_demo\conf\redis.properties.
+I0905 11:39:11.730494   17904 main.go:187] [Rtn6]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0905 11:39:11.797074   17904 main.go:207] [Rtn6]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0905 11:39:11.797074   17904 main.go:207] [Rtn8]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0905 11:39:11.797074   17904 main.go:124] [Rtn6]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_134.132.93.207_25f6cc0fcdb543c78894f566f1178367.
+I0905 11:39:11.797074   17904 main.go:124] [Rtn8]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_134.132.93.207_25f6cc0fcdb543c78894f566f1178367.
+I0905 11:39:11.998660   17904 main.go:127] [Rtn8]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_134.132.93.207_25f6cc0fcdb543c78894f566f1178367.
+I0905 11:39:11.998660   17904 main.go:138] [Rtn8]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0905 11:39:11.999161   17904 main.go:127] [Rtn6]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_134.132.93.207_25f6cc0fcdb543c78894f566f1178367.
+I0905 11:39:12.004160   17904 main.go:138] [Rtn6]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.

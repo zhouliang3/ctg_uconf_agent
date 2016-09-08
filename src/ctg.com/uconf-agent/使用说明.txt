@@ -1,0 +1,12 @@
+------------------------运行说明
+1. 修改conf/uconf.yml配置，主要是要改下server和port
+2. 运行uconf-agent.exe；此版本为windows 64位下编译生成的，uconf-agent是在linux64位上编译生成的可执行文件
+3. 查看运行日志，路径为：log/***
+4. 可单独将conf目录和uconf-agent.exe/uconf-agent拷贝到任意目录下执行，会自动生成log目录
+
+
+--------------------------重新编译说明
+1. 下载并安装相应的go 1.6.x环境，具体安装参考:https://golang.org/doc/install
+2. 按照官网的步骤安装和配置相关环境变量之后，将{yourpath}\ctg-uconf\ctg-uconf-agent\ 添加到环境变量GOPATH中
+3. 在{yourpath}\ctg-uconf\ctg-uconf-agent\src\ctg.com\uconf-agent 下执行 go build
+4. 按照"运行说明"配置下。
