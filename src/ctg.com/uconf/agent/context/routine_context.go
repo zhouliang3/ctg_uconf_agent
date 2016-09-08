@@ -30,18 +30,18 @@ func NewFileContext(FileName, Url, Path, FileZkPath, InstanceZkPath string, data
 
 func NewRoutineContext(FileName, Url, Path, FileZkPath, InstanceZkPath string) *RoutineContext {
 	fileContext := NewFileContext(FileName, Url, Path, FileZkPath, InstanceZkPath, nil)
-	return &RoutineContext{fileContext, newRoutineId(), nil}
+	return &RoutineContext{fileContext, NewRoutineId(), nil}
 }
 
 func NewRequestRoutineContext(url string, headers map[string]string) *RoutineContext {
-	return &RoutineContext{nil, newRoutineId(), &RequestContext{url, headers}}
+	return &RoutineContext{nil, NewRoutineId(), &RequestContext{url, headers}}
 }
 
 func InitMainRoutineContext() *RoutineContext {
-	return &RoutineContext{nil, newRoutineId(), nil}
+	return &RoutineContext{nil, NewRoutineId(), nil}
 }
 
-func newRoutineId() int32 {
+func NewRoutineId() int32 {
 	return atomic.AddInt32(&idx, 1)
 }
 

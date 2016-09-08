@@ -2,9 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"path/filepath"
-	//	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,7 +43,6 @@ func main() {
 	if autoReload { //需要连接zk,那么就必须等获取到zk服务器信息之后才继续下面的动作
 		var servers []string
 		servers, prefix = zkMgr.ZooInfo(zooAction)
-		fmt.Println(prefix)
 		//TODO 如果建立连接失败暂时不进一步处理
 		zkMgr.InitZk(MainRoutineContext, servers, ZkSateCallBack)
 	}
@@ -76,15 +73,12 @@ func loadAppInfoByKey(aInfo *fileutils.App, appInstance *app.Instance) {
 	//根据app.Id获取[name,tenant,version,env]
 	glog.Info("开始根据app key,获取app的[name,tenant,version,env]")
 	url := appAction + "?appKey=" + aInfo.Key
-	fmt.Println(url)
 	requestContext := context.NewRequestRoutineContext(url, nil)
 	output := appRetryer.DoRetry(httpclient.RetryableGetJsonData, requestContext)
 	if data, ok := output.Result.(map[string]interface{}); ok {
 		if success, ok := data["success"].(string); ok {
-			fmt.Println("success is:::", success)
 			if success == "true" {
 				if result, ok := data["result"].(map[string]interface{}); ok {
-					fmt.Println("result is:::", result)
 					appInstance.AppName = result["appCode"].(string)
 					appInstance.Tenant = result["tenantCode"].(string)
 					appInstance.Env = result["envCode"].(string)
@@ -122,30 +116,17 @@ func appFilelistLoad(appInstance *app.Instance) {
 					if "file" != cfg.ConfigType {
 						continue
 					}
-					go func(cfg httpclient.AppConfig) {
-						fmt.Printf("config name is:\n %s\n", cfg.ConfigName)
-						fmt.Printf("config value is:\n %s\n", cfg.ConfigValue)
-						fileName := cfg.ConfigName
-						fileValue := cfg.ConfigValue
-						filepath := appInstance.Dir + string(filepath.Separator) + fileName
-						//文件保存成功之后，需要开始监听每个配置文件的变化
-						//配置更新是否需要重新下载
-						//获取监听上下文
-						fileZkPath, instanceZkPath := appInstanceNode(prefix, fileName, appInstance)
-						url := fileDownloadUrl(fileAction, appInstance, fileName)
-						ctx := context.NewRoutineContext(fileName, url, filepath, fileZkPath, instanceZkPath)
+					fileName := cfg.ConfigName
+					fileValue := cfg.ConfigValue
+					filepath := appInstance.Dir + string(filepath.Separator) + fileName
+					//需要开始监听每个配置文件的变化
+					//获取监听上下文
+					fileZkPath, instanceZkPath := appInstanceNode(prefix, fileName, appInstance)
+					url := fileDownloadUrl(fileAction, appInstance, fileName)
+					ctx := context.NewRoutineContext(fileName, url, filepath, fileZkPath, instanceZkPath)
+					ctx.FileContext.Data = []byte(fileValue)
+					go dealFileItem(ctx)
 
-						glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, fileName, fileValue)
-						glog.Infof("[Rtn%d]开始保存配置文件%s.", ctx.RoutineId, fileName)
-						fileutils.WriteFile(filepath, []byte(fileValue))
-						glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, filepath)
-						if autoReload {
-							//开始监听配置文件节点的事件
-							ctx.FileContext.Data = []byte(fileValue)
-							dealFileItem(ctx, false)
-						}
-
-					}(cfg)
 				}
 			} else {
 				glog.Warning("应用[%s]未查询到配置文件信息!", appInstance.AppName)
@@ -176,13 +157,20 @@ func filelistLoadUrl(serverAddr string, appInstance *app.Instance) string {
 }
 
 //处理配置文件，包含：下载配置文件，保存配置文件到指定目录，监听配置文件节点，创建Agent实例临时节点
-func dealFileItem(ctx *context.RoutineContext, needDownload bool) {
+func dealFileItem(ctx *context.RoutineContext) {
 	defer glog.Flush()
 	for {
 		var data []byte
 		var success bool = false
-		if needDownload { //判断是否需要下载
-			data, success = downloadAndSave(ctx)
+		if ctx.FileContext.Data == nil || len(ctx.FileContext.Data) < 1 { //判断是否需要下载
+			data, success = download(ctx)
+		} else {
+			success = true
+			data = ctx.FileContext.Data
+		}
+		save(ctx, data)
+		if !autoReload {
+			return
 		}
 		//先判断配置文件zk节点是否存在，或者zk服务器异常连不上
 		if atomic.LoadInt32(&zkState) == 1 { //zk连接是否正常，下面代码执行期间也可能出现zk断开的问题
@@ -193,10 +181,7 @@ func dealFileItem(ctx *context.RoutineContext, needDownload bool) {
 			if !exists {
 				break
 			}
-			if success && !needDownload {
-				if success {
-					ctx.FileContext.Data = data
-				}
+			if success {
 				zkRetryer := retryer.ZkRequestRetryer()
 				output := zkRetryer.DoRetry(CreateOrUpdateInstNode, ctx)
 				if output.Err == nil {
@@ -207,11 +192,9 @@ func dealFileItem(ctx *context.RoutineContext, needDownload bool) {
 			}
 			//当有节点变更事件触发时，此方法返回，否则此方法一直阻塞
 			watchFileNode(ctx)
-			needDownload = true
 		} else {
 			//zk连接不上，先等待连接
 			time.Sleep(consts.UnreliableZkRetryGap)
-			needDownload = false
 		}
 
 	}
@@ -220,6 +203,9 @@ func dealFileItem(ctx *context.RoutineContext, needDownload bool) {
 
 //创建实例临时节点
 func CreateOrUpdateInstNode(ctx *context.RoutineContext) *context.OutputContext {
+	defer func() {
+		ctx.FileContext.Data = nil
+	}()
 	glog.Infof("[Rtn%d]开始创建Agent实例临时节点:%s.", ctx.RoutineId, ctx.FileContext.InstanceZkPath)
 	success := zkMgr.CreateOrUpdateEphemeralNode(ctx.FileContext.InstanceZkPath, ctx.FileContext.Data)
 	if success {
@@ -264,21 +250,23 @@ func Watch(ctx *context.RoutineContext) *context.OutputContext {
 }
 
 //下载配置文件并保存
-func downloadAndSave(ctx *context.RoutineContext) ([]byte, bool) {
+func download(ctx *context.RoutineContext) ([]byte, bool) {
 	glog.Infof("[Rtn%d]开始下载配置文件:%s", ctx.RoutineId, ctx.FileContext.FileName) //下载
 	data, success := httpclient.DownloadFromServer(ctx.FileContext.Url)
 	if success {
 		glog.Infof("[Rtn%d]下载配置文件%s成功.", ctx.RoutineId, ctx.FileContext.FileName)
-		glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileContext.FileName, string(data))
-		glog.Infof("[Rtn%d]开始保存配置文件%s.", ctx.RoutineId, ctx.FileContext.FileName)
-		fileutils.WriteFile(ctx.FileContext.Path, data)
-		glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.FileContext.Path)
 	} else {
 		glog.Infof("[Rtn%d]下载配置文件%s失败!", ctx.RoutineId)
 		return nil, false //下载失败返回一个空的字符串
 	}
 	return data, success
 
+}
+func save(ctx *context.RoutineContext, data []byte) {
+	glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileContext.FileName, string(data))
+	glog.Infof("[Rtn%d]开始保存配置文件%s.", ctx.RoutineId, ctx.FileContext.FileName)
+	fileutils.WriteFile(ctx.FileContext.Path, data)
+	glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.FileContext.Path)
 }
 
 //校验配置文件节点是否存在
