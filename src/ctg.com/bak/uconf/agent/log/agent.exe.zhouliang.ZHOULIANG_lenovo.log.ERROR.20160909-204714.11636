@@ -1,0 +1,5 @@
+Log file created at: 2016/09/09 20:47:14
+Running on machine: zhouliang
+Binary: Built with gc go1.6 for windows/amd64
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E0909 20:47:14.419899   11636 zkMgr.go:51] 与zk服务器连接断开.
