@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
 	"path/filepath"
-	"sync"
+	//	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,9 +28,17 @@ var MainRoutineContext *context.RoutineContext
 var zooAction, fileAction, appAction, cfglistAction string
 var prefix string
 
+//任务队列
+var jobs chan task = make(chan task, 20)
+
 func main() {
+	//agent -path=ab -appId=cd -address=ee
+	var routpath = flag.String("path", "", "托管应用的绝对路径")
+	var iappId = flag.String("appId", "", "托管应用编码")
+	var iaddress = flag.String("address", "", "配置中心上下文地址，形如:10.142.90.23:8082/uconf-web")
 	flag.Parse()
 	defer glog.Flush()
+	glog.Info("命令行参数为:", os.Args)
 	MainRoutineContext = context.InitMainRoutineContext()
 	//定时flush日志
 	flushLog()
@@ -47,24 +57,41 @@ func main() {
 		zkMgr.InitZk(MainRoutineContext, servers, ZkSateCallBack)
 	}
 	var stopSignal chan int = make(chan int, 1)
+	//开启工作线程
+	startupWorkers()
 	//根据app.Id获取app详细信息,先构造一个重试器，无限重试
 	//	appRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
-	var latch sync.WaitGroup
+	//var latch sync.WaitGroup
 	for _, appCfg := range agentConfig.Apps {
-		latch.Add(1)
-		go func() {
-			//构造app实例
-			appInstance := app.NewInstance(machine.Ip, machine.HoseName, appCfg.Dir)
-			loadAppInfoByKey(&appCfg, appInstance)
-
-			//需要根据app的信息从配置中心获取此app所有的配置文件列表，然后，依次处理这些文件，并监听配置文件列表的变化
-			appFilelistLoad(appInstance)
-			latch.Done()
-		}()
+		//latch.Add(1)
+		taski := task{machine, appCfg}
+		jobs <- taski
+		//go worker(machine, appCfg, latch)
 	}
 	//等待获取应用信息完成
-	latch.Wait()
+	//latch.Wait()
 	<-stopSignal
+}
+func startupWorkers() {
+	for i := 0; i < consts.MaxRoutineNums; i++ {
+		go worker()
+	}
+
+}
+func worker() {
+	taski := <-jobs
+	//构造app实例
+	appInstance := app.NewInstance(taski.machine.Ip, taski.machine.HoseName, taski.appCfg.Dir)
+	loadAppInfoByKey(&taski.appCfg, appInstance)
+
+	//需要根据app的信息从配置中心获取此app所有的配置文件列表，然后，依次处理这些文件，并监听配置文件列表的变化
+	appFilelistLoad(appInstance)
+	//latch.Done()
+}
+
+type task struct {
+	machine *host.Machine
+	appCfg  fileutils.App
 }
 
 //根据Agent配置文件uconf.yml中配置的app key获取app的[name,tenant,version,env]信息
@@ -308,8 +335,8 @@ func appInstanceNode(prefix, filename string, app *app.Instance) (string, string
 func flushLog() {
 	ticker := time.NewTicker(consts.LogFlushGap)
 	go func() {
-		for t := range ticker.C {
-			t.Year()
+		for _ = range ticker.C {
+			//t.Year()
 			glog.Flush()
 		}
 	}()
