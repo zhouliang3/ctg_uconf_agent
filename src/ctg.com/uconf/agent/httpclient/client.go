@@ -19,9 +19,9 @@ type CfgListRespose struct {
 }
 
 type AppConfig struct {
-	ConfigDeployId, ConfigId, AppVersionId, EnvId int64
-	ConfigVersion                                 int32
-	ConfigValue, ConfigType, ConfigName           string
+	ConfigDeployId, ConfigId, AppVersionId, EnvId   int64
+	ConfigVersion                                   int32
+	ConfigValue, ConfigType, ConfigName, ConfigPath string
 }
 
 //发送Get请求，返回请求响应结果

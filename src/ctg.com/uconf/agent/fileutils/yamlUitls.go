@@ -31,15 +31,9 @@ func (this *RestServer) ServerActionAddress() (string, string, string, string) {
 	return srvAddr + consts.ZooApiPath, srvAddr + consts.FileApiPath, srvAddr + consts.AppApiPath, srvAddr + consts.CfgListpath
 }
 
-type App struct {
-	Name string
-	Key  string
-	Dir  string
-}
 type AgentConfig struct {
 	Enabled bool
 	Server  RestServer
-	Apps    []App
 }
 
 func Read() *AgentConfig {
@@ -66,18 +60,6 @@ func checkConfig(config *AgentConfig) {
 	if config.Server.Port == "" {
 		glog.Fatal("Agent配置文件校验失败,server.port未配置!")
 		panic("Agent配置文件校验失败,server.port未配置!")
-	}
-
-	if len(config.Apps) < 1 {
-		glog.Fatal("未配置app!")
-		panic("未配置app!")
-	}
-
-	for _, app := range config.Apps {
-		if app.Key == "" {
-			glog.Fatal("Agent配置文件校验失败,请配置app Key!")
-			panic("Agent配置文件校验失败,请配置app Key!")
-		}
 	}
 	glog.Info("校验Agent配置文件通过.")
 }

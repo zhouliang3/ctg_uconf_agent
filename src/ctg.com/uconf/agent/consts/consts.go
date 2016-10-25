@@ -17,7 +17,7 @@ const ZooApiPath string = "/api/zoo"
 
 const FileApiPath string = "/api/config/file"
 
-const AppApiPath string = "/api/app/resolveAppKey"
+const AppApiPath string = "/api/config/loadAppInfoByVersionId"
 
 const CfgListpath string = "/api/config/list"
 
@@ -47,3 +47,6 @@ const UnreliableHttpRetryGap = time.Second * 5
 
 //获取zookeeper连接地址的重试时间间隔
 const HttpFetchInfoRetryGap = time.Second * 90
+
+//开启的线程数
+const MaxRoutineNums = 10

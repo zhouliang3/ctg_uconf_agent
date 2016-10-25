@@ -24,7 +24,7 @@ func NewInstance(ip, hostname, dir string) *Instance {
 }
 
 func (app *Instance) AppNodePath() string {
-	return app.Tenant + "_" + app.AppName + "_" + app.Version + "_" + app.Env
+	return app.Tenant + "_" + app.AppName + "_" + app.Version
 }
 func (app *Instance) InstanceNodePath() string {
 	return app.HostName + "_" + app.Ip + "_" + app.Uuid
