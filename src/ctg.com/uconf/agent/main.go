@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -34,6 +33,8 @@ var prefix string
 var Arootpath = flag.String("path", "", "托管应用的绝对路径") //"E:/work/maven/repository/com/ctgae/alogic/alogic-demo-web/0.0.1-SNAPSHOT/t/alogic-demo-web-0.0.1-SNAPSHOT.war"
 var AappKey = flag.Int64("key", -1, "托管应用编码")        //int64(2000)
 func main() {
+	//agent.exe -path=E:/work/maven/repository/com/ctgae/alogic/alogic-demo-web/0.0.1-SNAPSHOT/t/alogic-demo-web-0.0.1-SNAPSHOT.war -key=2000
+	//./agent -path=/root/work/src/ctg.com/t/alogic-demo-web-0.0.1-SNAPSHOT.war -key=2000
 	flag.Parse()
 	defer glog.Flush()
 	if "linux" == runtime.GOOS {
@@ -49,39 +50,48 @@ func main() {
 	}
 	//agent -path=ab -key=cd -address=ee
 	//
+	glog.Info("命令行参数为:", os.Args)
+
 	rootpath := *Arootpath
 	appKey := *AappKey
 	var ext = filepath.Ext(rootpath)
 	if ext != ".jar" && ext != ".war" {
-		panic("应用打包后的格式必须为jar或者war")
+		panic("文件类型必须为jar或者war")
 	}
 	//先将jar或者war拷贝到临时目录下
+
 	dir, filename := filepath.Split(rootpath)
 	idx := strings.LastIndex(rootpath, ":")
 	tmpDir := dir + "agentTmp"
 	tmpFile := tmpDir + string(filepath.Separator) + filename
+	glog.Infof("将应用程序文件:%s,拷贝到临时目录下:%s", rootpath, tmpFile)
 	fileutils.CopyFile(tmpFile, rootpath)
-	os.Remove(rootpath) //删掉源文件
 	disk := ""
 	if idx > 0 {
 		//windows下的绝对路径，需要先切换盘符
 		disk = strutils.Substring(rootpath, 0, idx+1) + flagAnd
 	}
 
-	fmt.Println(dir)
-	fmt.Println(filename)
-	fmt.Println(disk)
-	fmt.Println(runtime.GOOS)
 	//先解压,将jar或者war包解压到临时目录
 	cmdline := disk + "cd " + tmpDir + flagAnd + " jar -xvf  " + filename
-	fmt.Println(cmdline)
 	c := exec.Command(cmd, tag, cmdline)
-	c.Stdout = os.Stdout
-	c.Run()
+	glog.Infof("开始执行命令:%s\n", c.Args)
+
+	unzipOut, err1 := c.Output()
+	c.Wait()
+	if err1 != nil {
+		glog.Error("压缩为jar/war包出现异常", err1)
+		panic(err1)
+	} else {
+		glog.Infof("开始解压缩%s\n", tmpFile)
+		glog.Info(string(unzipOut))
+		glog.Infof("结束解压缩%s\n", tmpFile)
+
+	}
+	glog.Infof("删除临时应用程序文件:%s", tmpFile)
 	//删除临时war包
 	os.Remove(tmpFile)
 	//var iaddress = flag.String("address", "", "配置中心上下文地址，形如:10.142.90.23:8082/uconf-web")
-	glog.Info("命令行参数为:", os.Args)
 	MainRoutineContext = context.InitMainRoutineContext()
 	//定时flush日志
 	flushLog()
@@ -92,26 +102,40 @@ func main() {
 	zooAction, fileAction, appAction, cfglistAction = agentConfig.Server.ServerActionAddress()
 	//获取机器信息
 	machine := host.Info(agentConfig.Server.Ip + ":" + agentConfig.Server.Port)
-	fmt.Println(machine)
 	//初始化zookeeper
 	appInstance := app.NewInstance(machine.Ip, machine.HoseName, tmpDir)
-	fmt.Println(appInstance)
 
 	//根据命令行传入的key获取应用的详细信息
 	loadAppInfoByKey(appKey, appInstance)
 	//根据应用的详细信息下载应用
 	appFilelistLoad(appInstance)
+	glog.Infof("删除原应用程序文件:%s", rootpath)
+	os.Remove(rootpath) //删掉源文件
 
 	//压缩为jar或者war
 	cmdline = disk + "cd " + tmpDir + flagAnd + " jar -cvf " + filename + " * "
 	c = exec.Command(cmd, tag, cmdline)
-	fmt.Println("=======================")
-	c.Stdout = os.Stdout
-	c.Run()
+	//c.Stdout = os.Stdout
+	//c.Run()
+	//
+	glog.Infof("开始执行命令:%s\n", c.Args)
+
+	zipOut, err := c.Output()
 	c.Wait()
+
+	if err != nil {
+		glog.Error("压缩为jar/war包出现异常", err)
+		panic(err)
+	} else {
+		glog.Infof("开始压缩%s\n", tmpFile)
+		glog.Info(string(zipOut))
+		glog.Infof("结束压缩%s\n", tmpFile)
+	}
+	glog.Infof("临时目录中的应用程序文件:%s,拷贝到原目录:%s", tmpFile, rootpath)
+
 	//从临时目录拷贝回去
 	fileutils.CopyFile(rootpath, tmpFile)
-
+	glog.Infof("删除临时目录%s", tmpDir)
 	//删除临时目录
 	os.RemoveAll(tmpDir)
 }
@@ -124,14 +148,14 @@ func loadAppInfoByKey(key int64, appInstance *app.Instance) {
 	url := appAction + "?versionId=" + strconv.FormatInt(key, 10)
 	requestContext := context.NewRequestRoutineContext(url, nil)
 	output := appRetryer.DoRetry(httpclient.RetryableGetJsonData, requestContext)
-	fmt.Println("outputis ", output)
+	glog.Info(output)
 	if data, ok := output.Result.(map[string]interface{}); ok {
 		if success, ok := data["success"].(string); ok {
 			if success == "true" {
 				if result, ok := data["result"].(map[string]interface{}); ok {
 					appInstance.AppName = result["appCode"].(string)
 					appInstance.Tenant = result["tenantCode"].(string)
-					appInstance.Version = result["appVersion"].(string)
+					appInstance.Version = result["version"].(string)
 
 					glog.Infof("获取成功,App信息为[name=%s,tenant=%s,version=%s].", appInstance.AppName, appInstance.Tenant, appInstance.Version)
 					return
@@ -157,7 +181,6 @@ func appFilelistLoad(appInstance *app.Instance) {
 	cfglistRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
 	conflistContext := context.NewRequestRoutineContext(listUrl, nil)
 	listOutut := cfglistRetryer.DoRetry(httpclient.RetryableGetFileList, conflistContext)
-	fmt.Println("listoutput", listOutut)
 	if cfglist, ok := listOutut.Result.(httpclient.CfgListRespose); ok {
 		if "true" == cfglist.Success {
 			if len(cfglist.Result) > 0 {
