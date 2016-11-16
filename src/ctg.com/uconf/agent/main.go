@@ -80,7 +80,7 @@ func main() {
 	unzipOut, err1 := c.Output()
 	c.Wait()
 	if err1 != nil {
-		glog.Error("压缩为jar/war包出现异常", err1)
+		glog.Errorf("压缩为jar/war包出现异常:%s,输出结果:%s", err1, string(unzipOut))
 		panic(err1)
 	} else {
 		glog.Infof("开始解压缩%s\n", tmpFile)
