@@ -1,16 +1,16 @@
 enabled: true									#是否监听配置变化
-#server:
-# ip: 10.142.90.23   #127.0.0.1					#10.142.90.23 服务端Ip
-# port: 8082										#服务端port
-# context: uconf-web 							#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
 server:
- ip: 127.0.0.1									#10.142.90.23 服务端Ip
- port: 8080										#服务端port
- context: 										#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
-apps:											#本地应用数组
-- name: uconf_demo								#应用名称,可为空,只是方便配置人员识别,程序中不会用到
-  key: eyJhcHBDb2RlIjoidWNvbmZfZGVtbyIsImFwcFZlcnNpb24iOiIxXzBfMF8wIiwiZW52Q29kZSI6InJkIiwidGVuYW50Q29kZSI6ImZqIn0=							#应用的指纹,不可为空,由配置中心提供,
-  dir: e:\uconf_demo1							#配置文件存放目录
+ ip: 10.142.90.23   #127.0.0.1					#10.142.90.23 服务端Ip
+ port: 8082										#服务端port
+ context: uconf-web 							#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+#server:
+# ip: 127.0.0.1									#10.142.90.23 服务端Ip
+# port: 8080										#服务端port
+# context: 										#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+#apps:											#本地应用数组
+#- name: uconf_demo								#应用名称,可为空,只是方便配置人员识别,程序中不会用到
+#  key: eyJhcHBDb2RlIjoidWNvbmZfZGVtbyIsImFwcFZlcnNpb24iOiIxXzBfMF8wIiwiZW52Q29kZSI6InJkIiwidGVuYW50Q29kZSI6ImZ6In0=		 #eyJhcHBDb2RlIjoidWNvbmZfZGVtbyIsImFwcFZlcnNpb24iOiIxXzBfMF8wIiwiZW52Q29kZSI6InJkIiwidGVuYW50Q29kZSI6ImZqIn0=							#应用的指纹,不可为空,由配置中心提供,
+#  dir: tmp/uconf_demo1							#配置文件存放目录
 #- name: crm_1.0								#这是另外一个应用
 #....
 

@@ -2,10 +2,14 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
+	"os"
+	"strconv"
 	"time"
+
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"ctg.com/uconf/agent/app"
 	"ctg.com/uconf/agent/consts"
@@ -14,7 +18,7 @@ import (
 	"ctg.com/uconf/agent/host"
 	"ctg.com/uconf/agent/httpclient"
 	"ctg.com/uconf/agent/retryer"
-	"ctg.com/uconf/agent/zkMgr"
+	"ctg.com/uconf/agent/strutils"
 	"github.com/golang/glog"
 )
 
@@ -24,11 +28,70 @@ var autoReload bool
 var zkState int32
 var MainRoutineContext *context.RoutineContext
 var zooAction, fileAction, appAction, cfglistAction string
+var cmd, tag, rootpath, configFile, flagAnd string = "", "", "", "", ""
 var prefix string
-
+var Arootpath = flag.String("path", "", "托管应用的绝对路径") //"E:/work/maven/repository/com/ctgae/alogic/alogic-demo-web/0.0.1-SNAPSHOT/t/alogic-demo-web-0.0.1-SNAPSHOT.war"
+var AappKey = flag.Int64("key", -1, "托管应用编码")        //int64(2000)
 func main() {
+	//agent.exe -path=E:/work/maven/repository/com/ctgae/alogic/alogic-demo-web/0.0.1-SNAPSHOT/t/alogic-demo-web-0.0.1-SNAPSHOT.war -key=2000
+	//./agent -path=/root/work/src/ctg.com/t/alogic-demo-web-0.0.1-SNAPSHOT.war -key=2000
 	flag.Parse()
 	defer glog.Flush()
+	if "linux" == runtime.GOOS {
+		cmd = "/bin/sh"
+		tag = "-c"
+		flagAnd = " && "
+	} else if "windows" == runtime.GOOS { //windows系统
+		cmd = "cmd"
+		tag = "/C"
+		flagAnd = " & "
+	} else {
+		panic("暂时不支持 " + runtime.GOOS + " 操作系统!")
+	}
+	//agent -path=ab -key=cd -address=ee
+	//
+	glog.Info("命令行参数为:", os.Args)
+
+	rootpath := *Arootpath
+	appKey := *AappKey
+	var ext = filepath.Ext(rootpath)
+	if ext != ".jar" && ext != ".war" {
+		panic("文件类型必须为jar或者war")
+	}
+	//先将jar或者war拷贝到临时目录下
+
+	dir, filename := filepath.Split(rootpath)
+	idx := strings.LastIndex(rootpath, ":")
+	tmpDir := dir + "agentTmp"
+	tmpFile := tmpDir + string(filepath.Separator) + filename
+	glog.Infof("将应用程序文件:%s,拷贝到临时目录下:%s", rootpath, tmpFile)
+	fileutils.CopyFile(tmpFile, rootpath)
+	disk := ""
+	if idx > 0 {
+		//windows下的绝对路径，需要先切换盘符
+		disk = strutils.Substring(rootpath, 0, idx+1) + flagAnd
+	}
+
+	//先解压,将jar或者war包解压到临时目录
+	cmdline := disk + "cd " + tmpDir + flagAnd + " jar -xvf  " + filename
+	c := exec.Command(cmd, tag, cmdline)
+	glog.Infof("开始执行命令:%s\n", c.Args)
+
+	unzipOut, err1 := c.Output()
+	c.Wait()
+	if err1 != nil {
+		glog.Errorf("压缩为jar/war包出现异常:%s,输出结果:%s", err1, string(unzipOut))
+		panic(err1)
+	} else {
+		glog.Infof("开始解压缩%s\n", tmpFile)
+		glog.Info(string(unzipOut))
+		glog.Infof("结束解压缩%s\n", tmpFile)
+
+	}
+	glog.Infof("删除临时应用程序文件:%s", tmpFile)
+	//删除临时war包
+	os.Remove(tmpFile)
+	//var iaddress = flag.String("address", "", "配置中心上下文地址，形如:10.142.90.23:8082/uconf-web")
 	MainRoutineContext = context.InitMainRoutineContext()
 	//定时flush日志
 	flushLog()
@@ -40,56 +103,67 @@ func main() {
 	//获取机器信息
 	machine := host.Info(agentConfig.Server.Ip + ":" + agentConfig.Server.Port)
 	//初始化zookeeper
-	if autoReload { //需要连接zk,那么就必须等获取到zk服务器信息之后才继续下面的动作
-		var servers []string
-		servers, prefix = zkMgr.ZooInfo(zooAction)
-		//TODO 如果建立连接失败暂时不进一步处理
-		zkMgr.InitZk(MainRoutineContext, servers, ZkSateCallBack)
-	}
-	var stopSignal chan int = make(chan int, 1)
-	//根据app.Id获取app详细信息,先构造一个重试器，无限重试
-	//	appRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
-	var latch sync.WaitGroup
-	for _, appCfg := range agentConfig.Apps {
-		latch.Add(1)
-		go func() {
-			//构造app实例
-			appInstance := app.NewInstance(machine.Ip, machine.HoseName, appCfg.Dir)
-			loadAppInfoByKey(&appCfg, appInstance)
+	appInstance := app.NewInstance(machine.Ip, machine.HoseName, tmpDir)
 
-			//需要根据app的信息从配置中心获取此app所有的配置文件列表，然后，依次处理这些文件，并监听配置文件列表的变化
-			appFilelistLoad(appInstance)
-			latch.Done()
-		}()
+	//根据命令行传入的key获取应用的详细信息
+	loadAppInfoByKey(appKey, appInstance)
+	//根据应用的详细信息下载应用
+	appFilelistLoad(appInstance)
+	glog.Infof("删除原应用程序文件:%s", rootpath)
+	os.Remove(rootpath) //删掉源文件
+
+	//压缩为jar或者war
+	cmdline = disk + "cd " + tmpDir + flagAnd + " jar -cvf " + filename + " * "
+	c = exec.Command(cmd, tag, cmdline)
+	//c.Stdout = os.Stdout
+	//c.Run()
+	//
+	glog.Infof("开始执行命令:%s\n", c.Args)
+
+	zipOut, err := c.Output()
+	c.Wait()
+
+	if err != nil {
+		glog.Error("压缩为jar/war包出现异常", err)
+		panic(err)
+	} else {
+		glog.Infof("开始压缩%s\n", tmpFile)
+		glog.Info(string(zipOut))
+		glog.Infof("结束压缩%s\n", tmpFile)
 	}
-	//等待获取应用信息完成
-	latch.Wait()
-	<-stopSignal
+	glog.Infof("临时目录中的应用程序文件:%s,拷贝到原目录:%s", tmpFile, rootpath)
+
+	//从临时目录拷贝回去
+	fileutils.CopyFile(rootpath, tmpFile)
+	glog.Infof("删除临时目录%s", tmpDir)
+	//删除临时目录
+	os.RemoveAll(tmpDir)
 }
 
-//根据Agent配置文件uconf.yml中配置的app key获取app的[name,tenant,version,env]信息
-func loadAppInfoByKey(aInfo *fileutils.App, appInstance *app.Instance) {
+//根据Agent命令行参数中的key获取app的[name,tenant,version]信息
+func loadAppInfoByKey(key int64, appInstance *app.Instance) {
 	appRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
-	//根据app.Id获取[name,tenant,version,env]
-	glog.Info("开始根据app key,获取app的[name,tenant,version,env]")
-	url := appAction + "?appKey=" + aInfo.Key
+	//根据app.key获取[name,tenant,version]
+	glog.Info("开始根据app key,获取app的[name,tenant,version]")
+	url := appAction + "?versionId=" + strconv.FormatInt(key, 10)
 	requestContext := context.NewRequestRoutineContext(url, nil)
 	output := appRetryer.DoRetry(httpclient.RetryableGetJsonData, requestContext)
+	glog.Info(output)
 	if data, ok := output.Result.(map[string]interface{}); ok {
 		if success, ok := data["success"].(string); ok {
 			if success == "true" {
 				if result, ok := data["result"].(map[string]interface{}); ok {
 					appInstance.AppName = result["appCode"].(string)
 					appInstance.Tenant = result["tenantCode"].(string)
-					appInstance.Env = result["envCode"].(string)
-					appInstance.Version = result["appVersion"].(string)
-					glog.Infof("获取成功,App信息为[name=%s,tenant=%s,version=%s,env=%s].", appInstance.AppName, appInstance.Tenant, appInstance.Env, appInstance.Version)
+					appInstance.Version = result["version"].(string)
+
+					glog.Infof("获取成功,App信息为[name=%s,tenant=%s,version=%s].", appInstance.AppName, appInstance.Tenant, appInstance.Version)
 					return
 				} else {
 					glog.Error("解析返回的result为map类型失败")
 				}
 			} else {
-				glog.Errorf("根据appKey:%s获取[name,tenant,version,env]失败.", aInfo.Key)
+				glog.Errorf("根据appKey:%d获取[name,tenant,version]失败.", key)
 			}
 		} else {
 			glog.Error("解析返回的success字符为String类型失败")
@@ -97,7 +171,6 @@ func loadAppInfoByKey(aInfo *fileutils.App, appInstance *app.Instance) {
 	} else {
 		glog.Error("解析返回的字符为map类型失败")
 	}
-
 }
 
 //调用配置中心接口，下载应用下的所有已发布的配置文件
@@ -108,7 +181,6 @@ func appFilelistLoad(appInstance *app.Instance) {
 	cfglistRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
 	conflistContext := context.NewRequestRoutineContext(listUrl, nil)
 	listOutut := cfglistRetryer.DoRetry(httpclient.RetryableGetFileList, conflistContext)
-
 	if cfglist, ok := listOutut.Result.(httpclient.CfgListRespose); ok {
 		if "true" == cfglist.Success {
 			if len(cfglist.Result) > 0 {
@@ -118,15 +190,17 @@ func appFilelistLoad(appInstance *app.Instance) {
 					}
 					fileName := cfg.ConfigName
 					fileValue := cfg.ConfigValue
-					filepath := appInstance.Dir + string(filepath.Separator) + fileName
-					//需要开始监听每个配置文件的变化
-					//获取监听上下文
-					fileZkPath, instanceZkPath := appInstanceNode(prefix, fileName, appInstance)
-					url := fileDownloadUrl(fileAction, appInstance, fileName)
-					ctx := context.NewRoutineContext(fileName, url, filepath, fileZkPath, instanceZkPath)
-					ctx.FileContext.Data = []byte(fileValue)
-					go dealFileItem(ctx)
+					configPath := cfg.ConfigPath
 
+					if strings.HasPrefix(configPath, "/") { //相对于war包的绝对路径
+
+					} else { //相对于classpath的路径
+						configPath = "WEB-INF" + string(filepath.Separator) + "classes" + string(filepath.Separator) + configPath
+					}
+					filepath := appInstance.Dir + string(filepath.Separator) + configPath + string(filepath.Separator) + fileName
+					//保存配置文件到临时目录中
+					data := []byte(fileValue)
+					save(filepath, fileName, data)
 				}
 			} else {
 				glog.Warning("应用[%s]未查询到配置文件信息!", appInstance.AppName)
@@ -134,182 +208,32 @@ func appFilelistLoad(appInstance *app.Instance) {
 		} else {
 			glog.Error("查询配置信息返回失败!")
 			glog.Errorf("返回的详细内容为:%v", cfglist)
-
 		}
 	} else {
 		glog.Error("查询配置信息返回的数据类型错误!")
 	}
 }
 
-func ZkSateCallBack(isConnected bool) {
-	if isConnected {
-		atomic.StoreInt32(&zkState, 1)
-	} else {
-		atomic.StoreInt32(&zkState, 0)
-	}
-}
 func fileDownloadUrl(serverAddr string, appInstance *app.Instance, filename string) string {
-	return serverAddr + "?version=" + appInstance.Version + "&app=" + appInstance.AppName + "&env=" + appInstance.Env + "&key=" + filename + "&tenant=" + appInstance.Tenant + "&type=file"
+	return serverAddr + "?version=" + appInstance.Version + "&app=" + appInstance.AppName + "&key=" + filename + "&tenant=" + appInstance.Tenant + "&type=file" + "&env=rd"
 }
 
 func filelistLoadUrl(serverAddr string, appInstance *app.Instance) string {
-	return serverAddr + "?configType=file&version=" + appInstance.Version + "&app=" + appInstance.AppName + "&env=" + appInstance.Env + "&tenant=" + appInstance.Tenant
+	return serverAddr + "?configType=file&version=" + appInstance.Version + "&app=" + appInstance.AppName + "&tenant=" + appInstance.Tenant + "&env=rd"
 }
 
-//处理配置文件，包含：下载配置文件，保存配置文件到指定目录，监听配置文件节点，创建Agent实例临时节点
-func dealFileItem(ctx *context.RoutineContext) {
-	defer glog.Flush()
-	for {
-		var data []byte
-		var success bool = false
-		if ctx.FileContext.Data == nil || len(ctx.FileContext.Data) < 1 { //判断是否需要下载
-			data, success = download(ctx)
-		} else {
-			success = true
-			data = ctx.FileContext.Data
-		}
-		save(ctx, data)
-		if !autoReload {
-			return
-		}
-		//先判断配置文件zk节点是否存在，或者zk服务器异常连不上
-		if atomic.LoadInt32(&zkState) == 1 { //zk连接是否正常，下面代码执行期间也可能出现zk断开的问题
-			exists, err := checkFileNode(ctx)
-			if err != nil {
-				break
-			}
-			if !exists {
-				break
-			}
-			if success {
-				zkRetryer := retryer.ZkRequestRetryer()
-				output := zkRetryer.DoRetry(CreateOrUpdateInstNode, ctx)
-				if output.Err == nil {
-					ctx.FileContext.Data = nil
-				} else { //TODO 重试多次依然失败暂时无策略
-
-				}
-			}
-			//当有节点变更事件触发时，此方法返回，否则此方法一直阻塞
-			watchFileNode(ctx)
-		} else {
-			//zk连接不上，先等待连接
-			time.Sleep(consts.UnreliableZkRetryGap)
-		}
-
-	}
-
-}
-
-//创建实例临时节点
-func CreateOrUpdateInstNode(ctx *context.RoutineContext) *context.OutputContext {
-	defer func() {
-		ctx.FileContext.Data = nil
-	}()
-	glog.Infof("[Rtn%d]开始创建Agent实例临时节点:%s.", ctx.RoutineId, ctx.FileContext.InstanceZkPath)
-	success := zkMgr.CreateOrUpdateEphemeralNode(ctx.FileContext.InstanceZkPath, ctx.FileContext.Data)
-	if success {
-		glog.Infof("[Rtn%d]Agent实例临时节点创建成功:%s.\n", ctx.RoutineId, ctx.FileContext.InstanceZkPath)
-		return context.NewSuccessOutputContext(nil)
-	} else {
-		glog.Errorf("[Rtn%d]Agent实例临时节点创建失败:%s.\n", ctx.RoutineId, ctx.FileContext.InstanceZkPath)
-		return context.NewFailOutputContext("Agent实例临时节点创建失败")
-	}
-
-}
-
-//监听配置文件zk节点
-func watchFileNode(ctx *context.RoutineContext) {
-	glog.Infof("[Rtn%d]开始监听配置文件节点:%s.\n", ctx.RoutineId, ctx.FileContext.FileZkPath)
-	//监听配置文件的zk节点
-	for {
-		glog.Flush()
-		endlessRetry := retryer.NewEndlessRetryer(consts.UnreliableZkRetryGap)
-		output := endlessRetry.DoRetry(Watch, ctx)
-		if watcher, ok := output.Result.(zkMgr.NodeWatcher); ok {
-			event := <-watcher
-			glog.Infof("[Rtn%d]监听到节点%s发生[%s]事件.", ctx.RoutineId, ctx.FileContext.FileZkPath, event.Type.String())
-			if zkMgr.IsDataChanged(event) {
-				glog.Infof("[Rtn%d]配置文件节点发生变化:%s,准备重新下载.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-				break
-			}
-		} else {
-			glog.Errorf("[Rtn%d]监听配置文件接口返回值类型异常", ctx.RoutineId)
-			time.Sleep(consts.UnreliableZkRetryGap)
-		}
-	}
-}
-func Watch(ctx *context.RoutineContext) *context.OutputContext {
-	watcher, success := zkMgr.GetNodeWatcher(ctx.FileContext.FileZkPath) //需要处理zk异常
-	if !success {
-		errMsg := "监听配置文件节点:" + ctx.FileContext.FileZkPath + "失败"
-		return context.NewFailOutputContext(errMsg)
-	} else {
-		return context.NewSuccessOutputContext(watcher)
-	}
-}
-
-//下载配置文件并保存
-func download(ctx *context.RoutineContext) ([]byte, bool) {
-	glog.Infof("[Rtn%d]开始下载配置文件:%s", ctx.RoutineId, ctx.FileContext.FileName) //下载
-	data, success := httpclient.DownloadFromServer(ctx.FileContext.Url)
-	if success {
-		glog.Infof("[Rtn%d]下载配置文件%s成功.", ctx.RoutineId, ctx.FileContext.FileName)
-	} else {
-		glog.Infof("[Rtn%d]下载配置文件%s失败!", ctx.RoutineId)
-		return nil, false //下载失败返回一个空的字符串
-	}
-	return data, success
-
-}
-func save(ctx *context.RoutineContext, data []byte) {
-	glog.Infof("[Rtn%d]配置文件%s内容为:\n%s\n", ctx.RoutineId, ctx.FileContext.FileName, string(data))
-	glog.Infof("[Rtn%d]开始保存配置文件%s.", ctx.RoutineId, ctx.FileContext.FileName)
-	fileutils.WriteFile(ctx.FileContext.Path, data)
-	glog.Infof("[Rtn%d]配置文件已保存到:%s.", ctx.RoutineId, ctx.FileContext.Path)
-}
-
-//校验配置文件节点是否存在
-func checkFileNode(ctx *context.RoutineContext) (bool, error) {
-	glog.Infof("[Rtn%d]开始校验Zk上是否存在配置文件节点:%s.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-
-	zkRetryer := retryer.ZkRequestRetryer()
-	output := zkRetryer.DoRetry(NodeExists, ctx)
-	if exists, ok := output.Result.(bool); ok {
-		return exists, output.Err
-	} else { //这种情形不会存在
-		glog.Errorf("[Rtn%d]调用Zk节点是否存在接口返回值类型异常", ctx.RoutineId)
-		return false, output.Err
-	}
-}
-func NodeExists(ctx *context.RoutineContext) *context.OutputContext {
-	if isExists, err := zkMgr.ExistsNode(ctx.FileContext.FileZkPath); !isExists && err == nil {
-		glog.Errorf("[Rtn%d]配置文件节点:%s,不存在.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-		return context.NewSuccessOutputContext(false) //配置文件不存在,说明调用成功，返回false，err为nil
-	} else {
-		if err != nil {
-			glog.Errorf("[Rtn%d]校验Zk上是否存在配置文件节点出现异常.", ctx.RoutineId)
-			return context.NewErrorOutputContext(err)
-		} else {
-			glog.Infof("[Rtn%d]校验成功,Zk上存在配置文件节点:%s.", ctx.RoutineId, ctx.FileContext.FileZkPath)
-			return context.NewSuccessOutputContext(true)
-		}
-	}
-}
-
-// 获得实例保存到zk上的路径
-func appInstanceNode(prefix, filename string, app *app.Instance) (string, string) {
-	fileZkPath := prefix + "/" + app.AppNodePath() + "/file/" + filename
-	instanceZkPath := fileZkPath + "/" + app.InstanceNodePath()
-	return fileZkPath, instanceZkPath
+func save(filepath, filename string, data []byte) {
+	glog.Infof("配置文件%s内容为:\n%s\n", filename, string(data))
+	glog.Infof("开始保存配置文件%s.", filename)
+	fileutils.WriteFile(filepath, data)
+	glog.Infof("配置文件已保存到:%s.", filepath)
 }
 
 //定时将日志刷到文件中
 func flushLog() {
 	ticker := time.NewTicker(consts.LogFlushGap)
 	go func() {
-		for t := range ticker.C {
-			t.Year()
+		for _ = range ticker.C {
 			glog.Flush()
 		}
 	}()
