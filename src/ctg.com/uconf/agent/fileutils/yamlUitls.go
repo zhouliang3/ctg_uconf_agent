@@ -80,14 +80,11 @@ func LoadAgentConfig() []byte {
 }
 
 func configFilepath() string {
-	file, _ := exec.LookPath(os.Args[0])
-	path, _ := filepath.Abs(file)
-	dir, _ := filepath.Split(path)
-	inputFile := dir + consts.AgentYamlRelPath + string(filepath.Separator) + consts.AgentYamlFileName
+	inputFile := "/apps/uconf/" + consts.AgentYamlFileName
 	if _, err := os.Stat(inputFile); err != nil {
 		if os.IsNotExist(err) {
 			glog.Fatalf("配置文件%s不存在", inputFile)
-			panic("配置文件uconf.yml不存在!")
+			panic("配置文件" + inputFile + "不存在!")
 		}
 	}
 	return inputFile
