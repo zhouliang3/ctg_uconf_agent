@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -23,6 +22,8 @@ var autoReload bool
 
 var MainRoutineContext *context.RoutineContext
 var zooAction, fileAction, appRootAction, cfglistAction string
+var retryTimes int
+var retryInterval int64
 
 func main() {
 	flag.Parse()
@@ -30,8 +31,12 @@ func main() {
 	MainRoutineContext = context.InitMainRoutineContext()
 	//定时flush日志
 	flushLog()
+
 	//解析配置agent文件
 	agentConfig := fileutils.Read()
+	retryTimes = agentConfig.Server.Retry.Times
+	retryInterval = agentConfig.Server.Retry.Interval
+	retryer.InitHttpRequestRetryer(retryTimes, time.Duration(retryInterval)*time.Millisecond)
 	autoReload = agentConfig.Enabled
 	//获取RESTful API的url地址
 	zooAction, fileAction, appRootAction, cfglistAction = agentConfig.Server.ServerActionAddress()
@@ -45,6 +50,7 @@ func main() {
 
 	//根据应用的详细信息下载应用配置
 	appFilelistLoad(appInstance)
+
 }
 
 //根据Agent命令行参数中的key获取app的[code,tenant,version]信息
@@ -53,7 +59,6 @@ func loadAppInfoFromEnv(appInstance *app.Instance) {
 	glog.Info("从环境变量中获取app的[code,tenant,version,env]")
 	appEnv := os.Getenv("UCONF_AGENT_APP")
 	envs := strings.Split(appEnv, "|")
-	fmt.Println(appEnv, envs)
 	//校验环境变量的正确性
 	if len(envs) < 4 {
 		glog.Error("环境变量UCONF_AGENT_APP配置的 租户|应用|版本|环境，无效。环境变量UCONF_AGENT_APP=" + appEnv)
@@ -72,9 +77,12 @@ func appFilelistLoad(appInstance *app.Instance) {
 	listUrl := filelistLoadUrl(cfglistAction, appInstance)
 	glog.Infof("准备发送Http请求获取应用[%s]的所有配置文件,请求的Http接口:%s", appInstance.AppCode, listUrl)
 	//下载所有的配置
-	cfglistRetryer := retryer.NewEndlessRetryer(consts.HttpFetchInfoRetryGap)
 	conflistContext := context.NewRequestRoutineContext(listUrl, nil)
-	listOutut := cfglistRetryer.DoRetry(httpclient.RetryableGetFileList, conflistContext)
+	listOutut := httpclient.RetryableGetFileList(conflistContext)
+	if listOutut.Err != nil {
+		glog.Error("查询配置信息出现异常!")
+		panic("查询配置信息出现异常!")
+	}
 	if cfglist, ok := listOutut.Result.(httpclient.CfgListRespose); ok {
 		if "true" == cfglist.Success {
 			if len(cfglist.Result) > 0 {
@@ -87,10 +95,8 @@ func appFilelistLoad(appInstance *app.Instance) {
 					configPath := cfg.ConfigPath
 					if len(configPath) > 0 {
 						configPath = configPath + string(filepath.Separator)
-						fmt.Println("configpath is :" + configPath)
 					} else {
 						configPath = ""
-						fmt.Println("configpath is not configed:" + configPath)
 					}
 					filepath := appInstance.Dir + string(filepath.Separator) + configPath + fileName
 					//保存配置文件到/apps/uconf目录中
@@ -106,8 +112,8 @@ func appFilelistLoad(appInstance *app.Instance) {
 			panic("查询配置信息返回失败!")
 		}
 	} else {
-		glog.Error("查询配置信息返回的数据类型错误!")
-		panic("查询配置信息返回的数据类型错误!")
+		glog.Error("查询配置信息出现异常!")
+		panic("查询配置信息出现异常!")
 	}
 }
 

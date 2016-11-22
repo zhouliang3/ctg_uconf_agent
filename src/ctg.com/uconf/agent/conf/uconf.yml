@@ -1,5 +1,8 @@
 enabled: true									#是否监听配置变化
 server:
  ip: 10.142.90.23   #127.0.0.1					#10.142.90.23 服务端Ip
- port: 9090										#服务端port
+ port: 9091										#服务端port
  context: uconf-web 							#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+ retry:											#重试策略
+  times: 3										#重试次数
+  interval: 1000								#重试时间间隔,单位毫秒

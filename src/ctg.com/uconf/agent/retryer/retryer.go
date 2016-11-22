@@ -10,7 +10,7 @@ import (
 	"github.com/golang/glog"
 )
 
-const MinRetryGap = 100 * time.Millisecond
+const MinRetryGap = 50 * time.Millisecond
 
 type UnreliableCaller func(ctx *context.RoutineContext) *context.OutputContext
 
@@ -38,8 +38,11 @@ func ZkRequestRetryer() Retryer {
 }
 
 //http请求重试机制
-var httpRetryer Retryer = NewRoundRobinRetryer(consts.UnreliableHttpRetryTimes, consts.UnreliableHttpRetryGap)
+var httpRetryer Retryer
 
+func InitHttpRequestRetryer(times int, interval time.Duration) {
+	httpRetryer = NewRoundRobinRetryer(times, interval)
+}
 func HttpRequestRetryer() Retryer {
 	return httpRetryer
 }
@@ -47,6 +50,10 @@ func HttpRequestRetryer() Retryer {
 //重试RetryTimes次caller方法
 func (retryer RoundRobinRetryer) DoRetry(caller UnreliableCaller, ctx *context.RoutineContext) *context.OutputContext {
 	var lastOutput *context.OutputContext
+	if retryer.RetryTimes <= 0 {
+		output := caller(ctx)
+		return output
+	}
 	for i := 0; i < retryer.RetryTimes; i++ {
 		output := caller(ctx)
 		lastOutput = output

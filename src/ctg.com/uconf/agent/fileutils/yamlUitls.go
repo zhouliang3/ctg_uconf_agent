@@ -16,6 +16,11 @@ type RestServer struct {
 	Ip      string
 	Port    string
 	Context string
+	Retry   Retryer
+}
+type Retryer struct {
+	Times    int
+	Interval int64
 }
 
 func (this *RestServer) ServerActionAddress() (string, string, string, string) {
@@ -60,6 +65,14 @@ func checkConfig(config *AgentConfig) {
 		glog.Fatal("Agent配置文件校验失败,server.port未配置!")
 		panic("Agent配置文件校验失败,server.port未配置!")
 	}
+	//	if config.Server.Retry.Times <= 0 {
+	//		glog.Fatal("Agent配置文件校验失败,server.retry.times未配置!")
+	//		panic("Agent配置文件校验失败,server.retry.times未配置!")
+	//	}
+	//	if config.Server.Retry.Interval <= 0 {
+	//		glog.Fatal("Agent配置文件校验失败,server.retry.interval未配置!")
+	//		panic("Agent配置文件校验失败,server.retry.interval未配置!")
+	//	}
 	glog.Info("校验Agent配置文件通过.")
 }
 
