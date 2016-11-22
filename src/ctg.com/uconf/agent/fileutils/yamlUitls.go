@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
 	s "strings"
 
 	"ctg.com/uconf/agent/consts"
@@ -28,7 +27,7 @@ func (this *RestServer) ServerActionAddress() (string, string, string, string) {
 		this.Context = ""
 	}
 	srvAddr := "http://" + this.Ip + ":" + this.Port + this.Context
-	return srvAddr + consts.ZooApiPath, srvAddr + consts.FileApiPath, srvAddr + consts.AppApiPath, srvAddr + consts.CfgListpath
+	return srvAddr + consts.ZooApiPath, srvAddr + consts.FileApiPath, srvAddr + consts.AppRootDir, srvAddr + consts.CfgListpath
 }
 
 type AgentConfig struct {
@@ -80,11 +79,14 @@ func LoadAgentConfig() []byte {
 }
 
 func configFilepath() string {
-	inputFile := "/apps/uconf/" + consts.AgentYamlFileName
+	file, _ := exec.LookPath(os.Args[0])
+	path, _ := filepath.Abs(file)
+	dir, _ := filepath.Split(path)
+	inputFile := dir + consts.AgentYamlRelPath + string(filepath.Separator) + consts.AgentYamlFileName
 	if _, err := os.Stat(inputFile); err != nil {
 		if os.IsNotExist(err) {
 			glog.Fatalf("配置文件%s不存在", inputFile)
-			panic("配置文件" + inputFile + "不存在!")
+			panic("配置文件uconf.yml不存在!")
 		}
 	}
 	return inputFile

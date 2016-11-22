@@ -5,7 +5,7 @@ import (
 )
 
 //每过多久将日志刷到文件中去
-const LogFlushGap = time.Second * 1
+const LogFlushGap = time.Millisecond * 200
 
 //agent配置文件名称
 const AgentYamlFileName string = "uconf.yml"
@@ -17,9 +17,11 @@ const ZooApiPath string = "/api/zoo"
 
 const FileApiPath string = "/api/config/file"
 
-const AppApiPath string = "/api/config/loadAppInfoByVersionId"
+const AppRootPath string = "/api/config/appDir"
 
 const CfgListpath string = "/api/config/list"
+
+const AppRootDir string = "e:/apps/uconf"
 
 //zk重连时间间隔
 const ZkConnectRetryGap = time.Second * 5
