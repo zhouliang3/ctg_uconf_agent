@@ -25,6 +25,7 @@ var zooAction, fileAction, appRootAction, cfglistAction string
 var retryTimes int
 var retryInterval int64
 
+//window测试命令：e: & cd E:\GitHub\ctg_uconf_agent\src\ctg.com\uconf & agent.exe &echo success download config & c: & cd C:\Home\Programs Files\apache-tomcat-6.0.43\apache-tomcat-6.0.43\bin & startup.bat
 func main() {
 	flag.Parse()
 	defer glog.Flush()
@@ -45,7 +46,7 @@ func main() {
 	//初始化zookeeper
 	appInstance := app.NewInstance(machine.Ip, machine.HoseName, consts.AppRootDir)
 
-	//根据命令行传入的key获取应用的详细信息
+	//根据命令行传入的key获取应用的详细信息,fz|uconf_demo|1_0_0_0|1
 	loadAppInfoFromEnv(appInstance)
 
 	//根据应用的详细信息下载应用配置
@@ -57,17 +58,31 @@ func main() {
 func loadAppInfoFromEnv(appInstance *app.Instance) {
 	//根据app.key获取[code,tenant,version]
 	glog.Info("从环境变量中获取app的[code,tenant,version,env]")
-	appEnv := os.Getenv("UCONF_AGENT_APP")
-	envs := strings.Split(appEnv, "|")
+	tenantCode := strings.TrimSpace(os.Getenv("TENANT_CODE"))
+	appCode := strings.TrimSpace(os.Getenv("SERVICE_CODE"))
+	appVersion := strings.TrimSpace(os.Getenv("SERVICE_VER"))
+	env := strings.TrimSpace(os.Getenv("DEPLOY_ENV"))
 	//校验环境变量的正确性
-	if len(envs) < 4 {
-		glog.Error("环境变量UCONF_AGENT_APP配置的 租户|应用|版本|环境，无效。环境变量UCONF_AGENT_APP=" + appEnv)
-		panic("环境变量UCONF_AGENT_APP配置的 租户|应用|版本|环境，无效。环境变量UCONF_AGENT_APP=" + appEnv)
+	if len(tenantCode) <= 0 {
+		glog.Error("启动失败，请先配置环境变量TENANT_CODE")
+		panic("启动失败，请先配置环境变量TENANT_CODE")
 	}
-	appInstance.Tenant = envs[0]
-	appInstance.AppCode = envs[1]
-	appInstance.Version = envs[2]
-	appInstance.Env = envs[3]
+	if len(appCode) <= 0 {
+		glog.Error("启动失败，请先配置环境变量SERVICE_CODE")
+		panic("启动失败，请先配置环境变量SERVICE_CODE")
+	}
+	if len(appVersion) <= 0 {
+		glog.Error("启动失败，请先配置环境变量SERVICE_VER")
+		panic("启动失败，请先配置环境变量SERVICE_VER")
+	}
+	if len(appVersion) <= 0 {
+		glog.Error("启动失败，请先配置环境变量DEPLOY_ENV")
+		panic("启动失败，请先配置环境变量DEPLOY_ENV")
+	}
+	appInstance.Tenant = tenantCode
+	appInstance.AppCode = appCode
+	appInstance.Version = appVersion
+	appInstance.Env = env
 	glog.Infof("获取成功,App信息为[code=%s,tenant=%s,version=%s,env=%s].", appInstance.AppCode, appInstance.Tenant, appInstance.Version, appInstance.Env)
 	return
 }
