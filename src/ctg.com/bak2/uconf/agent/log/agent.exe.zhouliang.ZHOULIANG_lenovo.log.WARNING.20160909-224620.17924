@@ -1,0 +1,7 @@
+Log file created at: 2016/09/09 22:46:20
+Running on machine: zhouliang
+Binary: Built with gc go1.6 for windows/amd64
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E0909 22:46:20.684427   17924 zkMgr.go:61] 与zk服务器连接失败.开始重试.
+E0909 22:46:25.686998   17924 zkMgr.go:100] 与zk服务器建立连接超时.
+E0909 22:46:25.691001   17924 retryer.go:97] [Rtn1]与zk服务器建立连接超时 , 将在5秒后将重试.

@@ -3,11 +3,11 @@ package fileutils
 import (
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	s "strings"
 
 	"ctg.com/uconf/agent/consts"
+
 	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 )
@@ -23,7 +23,8 @@ type Retryer struct {
 	Interval int64
 }
 
-func (this *RestServer) ServerActionAddress() (string, string, string, string) {
+func (this *RestServer) ServerActionAddress() (string, string, string) {
+
 	if len(this.Context) > 0 {
 		if !s.HasPrefix(this.Context, "/") {
 			this.Context = "/" + this.Context
@@ -31,8 +32,9 @@ func (this *RestServer) ServerActionAddress() (string, string, string, string) {
 	} else {
 		this.Context = ""
 	}
-	srvAddr := "http://" + this.Ip + ":" + this.Port + this.Context
-	return srvAddr + consts.ZooApiPath, srvAddr + consts.FileApiPath, srvAddr + consts.AppRootDir, srvAddr + consts.CfgListpath
+	url := "http://" + this.Ip + ":" + this.Port + this.Context
+
+	return url + consts.ZooApiPath, url + consts.FileApiPath, url + consts.CfgListpath
 }
 
 type AgentConfig struct {
@@ -40,7 +42,7 @@ type AgentConfig struct {
 	Server  RestServer
 }
 
-func Read() *AgentConfig {
+func Read(cmdserver, cmdport, cmdcontext string) *AgentConfig {
 	t := &AgentConfig{}
 	data := LoadAgentConfig()
 	glog.Infof("开始解析Agent配置文件:%s.", consts.AgentYamlFileName)
@@ -50,6 +52,15 @@ func Read() *AgentConfig {
 		panic("Agent配置文件解析失败!")
 	}
 	glog.Info("成功解析Agent配置文件.")
+	if len(s.TrimSpace(cmdserver)) > 0 {
+		t.Server.Ip = cmdserver
+	}
+	if len(s.TrimSpace(cmdport)) > 0 {
+		t.Server.Port = cmdport
+	}
+	if len(s.TrimSpace(cmdcontext)) > 0 {
+		t.Server.Context = cmdcontext
+	}
 	checkConfig(t)
 	return t
 }
@@ -57,14 +68,14 @@ func Read() *AgentConfig {
 //配置校验
 func checkConfig(config *AgentConfig) {
 	glog.Info("开始校验Agent配置文件.")
-	if config.Server.Ip == "" {
-		glog.Fatal("Agent配置文件校验失败,server.ip未配置!")
-		panic("Agent配置文件校验失败,server.ip未配置!")
-	}
-	if config.Server.Port == "" {
-		glog.Fatal("Agent配置文件校验失败,server.port未配置!")
-		panic("Agent配置文件校验失败,server.port未配置!")
-	}
+	//	if config.Server.Ip == "" {
+	//		glog.Fatal("Agent配置文件校验失败,server.ip未配置!")
+	//		panic("Agent配置文件校验失败,server.ip未配置!")
+	//	}
+	//	if config.Server.Port == "" {
+	//		glog.Fatal("Agent配置文件校验失败,server.port未配置!")
+	//		panic("Agent配置文件校验失败,server.port未配置!")
+	//	}
 	//	if config.Server.Retry.Times <= 0 {
 	//		glog.Fatal("Agent配置文件校验失败,server.retry.times未配置!")
 	//		panic("Agent配置文件校验失败,server.retry.times未配置!")
@@ -92,10 +103,8 @@ func LoadAgentConfig() []byte {
 }
 
 func configFilepath() string {
-	file, _ := exec.LookPath(os.Args[0])
-	path, _ := filepath.Abs(file)
-	dir, _ := filepath.Split(path)
-	inputFile := dir + consts.AgentYamlRelPath + string(filepath.Separator) + consts.AgentYamlFileName
+
+	inputFile := GetExecRootPath() + consts.AgentYamlRelPath + string(filepath.Separator) + consts.AgentYamlFileName
 	if _, err := os.Stat(inputFile); err != nil {
 		if os.IsNotExist(err) {
 			glog.Fatalf("配置文件%s不存在", inputFile)

@@ -21,7 +21,7 @@ const AppRootPath string = "/api/config/appDir"
 
 const CfgListpath string = "/api/config/list"
 
-const AppRootDir string = "/apps/uconf"
+//const AppRootDir string = "/apps/uconf"
 
 //zk重连时间间隔
 const ZkConnectRetryGap = time.Second * 5

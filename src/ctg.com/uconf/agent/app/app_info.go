@@ -14,11 +14,10 @@ type Instance struct {
 	Ip       string
 	HostName string
 	Uuid     string
-	Dir      string
 }
 
-func NewInstance(ip, hostname, dir string) *Instance {
-	Instance := &Instance{Ip: ip, HostName: hostname, Dir: dir}
+func NewInstance(ip, hostname string) *Instance {
+	Instance := &Instance{Ip: ip, HostName: hostname}
 	Instance.Uuid = newUuid()
 	return Instance
 }

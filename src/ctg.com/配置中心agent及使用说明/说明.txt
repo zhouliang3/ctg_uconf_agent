@@ -1,0 +1,9 @@
+agent文件是在linux64位机器上生成的可执行文件，执行如下命令，即可从配置中心获取key对应的服务的配置文件：
+./agent -path=/root/work/src/ctg.com/t/alogic-demo-web-0.0.1-SNAPSHOT.war -key=2000
+path：war包或者jar包的绝对路径
+key：开发门户调用统一配置中心后返回的唯一标识
+
+conf目录下保存了配置中心服务器的地址
+log为agent的日志目录
+
+需将agent文件、conf目录存储在镜像的同一个目录下、log目录会自动生成

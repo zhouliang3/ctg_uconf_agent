@@ -27,6 +27,7 @@ func Info(serverAddr string) *Machine {
 func localIp(serverAddr string) string {
 	conn, err := net.Dial("udp", serverAddr)
 	if err != nil {
+		panic(err)
 	}
 	defer conn.Close()
 	ip := s.Split(conn.LocalAddr().String(), ":")[0]

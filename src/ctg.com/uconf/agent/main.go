@@ -25,7 +25,15 @@ var zooAction, fileAction, appRootAction, cfglistAction string
 var retryTimes int
 var retryInterval int64
 
+var cmdserver = flag.String("server", "", "服务器地址")
+var cmdport = flag.String("port", "", "服务器端口")
+var cmdcontext = flag.String("context", "", "服务端上下文")
+var cmdapp = flag.String("app", "", "应用编码")
+var cmdtenant = flag.String("tenant", "", "租户编码")
+var cmdversion = flag.String("version", "", "版本信息")
+
 //window测试命令：e: & cd E:\GitHub\ctg_uconf_agent\src\ctg.com\uconf & agent.exe &echo success download config & c: & cd C:\Home\Programs Files\apache-tomcat-6.0.43\apache-tomcat-6.0.43\bin & startup.bat
+//> agent.exe -server 10.142.90.23 -port 9090  -context uconf-web -app uconf_demo -tenant fz -version 1_0_0_0
 func main() {
 	flag.Parse()
 	defer glog.Flush()
@@ -34,21 +42,20 @@ func main() {
 	flushLog()
 
 	//解析配置agent文件
-	agentConfig := fileutils.Read()
+	agentConfig := fileutils.Read(*cmdserver, *cmdport, *cmdcontext)
 	retryTimes = agentConfig.Server.Retry.Times
 	retryInterval = agentConfig.Server.Retry.Interval
 	retryer.InitHttpRequestRetryer(retryTimes, time.Duration(retryInterval)*time.Millisecond)
 	autoReload = agentConfig.Enabled
+
 	//获取RESTful API的url地址
-	zooAction, fileAction, appRootAction, cfglistAction = agentConfig.Server.ServerActionAddress()
+	zooAction, fileAction, cfglistAction = agentConfig.Server.ServerActionAddress()
 	//获取机器信息
 	machine := host.Info(agentConfig.Server.Ip + ":" + agentConfig.Server.Port)
 	//初始化zookeeper
-	appInstance := app.NewInstance(machine.Ip, machine.HoseName, consts.AppRootDir)
-
+	appInstance := app.NewInstance(machine.Ip, machine.HoseName)
 	//根据命令行传入的key获取应用的详细信息,fz|uconf_demo|1_0_0_0|1
 	loadAppInfoFromEnv(appInstance)
-
 	//根据应用的详细信息下载应用配置
 	appFilelistLoad(appInstance)
 
@@ -56,33 +63,40 @@ func main() {
 
 //根据Agent命令行参数中的key获取app的[code,tenant,version]信息
 func loadAppInfoFromEnv(appInstance *app.Instance) {
+	//先获取命令行的[code,tenant,version]参数
+	appCode := strings.TrimSpace(*cmdapp)
+	tenantCode := strings.TrimSpace(*cmdtenant)
+	appVersion := strings.TrimSpace(*cmdversion)
 	//根据app.key获取[code,tenant,version]
+
 	glog.Info("从环境变量中获取app的[code,tenant,version,env]")
-	tenantCode := strings.TrimSpace(os.Getenv("TENANT_CODE"))
-	appCode := strings.TrimSpace(os.Getenv("SERVICE_CODE"))
-	appVersion := strings.TrimSpace(os.Getenv("SERVICE_VER"))
-	env := strings.TrimSpace(os.Getenv("DEPLOY_ENV"))
+
 	//校验环境变量的正确性
 	if len(tenantCode) <= 0 {
-		glog.Error("启动失败，请先配置环境变量TENANT_CODE")
-		panic("启动失败，请先配置环境变量TENANT_CODE")
+		tenantCode = strings.TrimSpace(os.Getenv("TENANT_CODE"))
+		if len(tenantCode) <= 0 {
+			glog.Error("启动失败，请先配置环境变量TENANT_CODE")
+			panic("启动失败，请先配置环境变量TENANT_CODE")
+		}
 	}
 	if len(appCode) <= 0 {
-		glog.Error("启动失败，请先配置环境变量SERVICE_CODE")
-		panic("启动失败，请先配置环境变量SERVICE_CODE")
+		appCode = strings.TrimSpace(os.Getenv("SERVICE_CODE"))
+		if len(appCode) <= 0 {
+			glog.Error("启动失败，请配置命令行参数-app的值或者配置环境变量SERVICE_CODE")
+			panic("启动失败，请配置命令行参数-app的值或者配置环境变量SERVICE_CODE")
+		}
 	}
 	if len(appVersion) <= 0 {
-		glog.Error("启动失败，请先配置环境变量SERVICE_VER")
-		panic("启动失败，请先配置环境变量SERVICE_VER")
+		appVersion = strings.TrimSpace(os.Getenv("SERVICE_VER"))
+		if len(appVersion) <= 0 {
+			glog.Error("启动失败，请先配置环境变量SERVICE_VER")
+			panic("启动失败，请先配置环境变量SERVICE_VER")
+		}
 	}
-	if len(appVersion) <= 0 {
-		glog.Error("启动失败，请先配置环境变量DEPLOY_ENV")
-		panic("启动失败，请先配置环境变量DEPLOY_ENV")
-	}
+
 	appInstance.Tenant = tenantCode
 	appInstance.AppCode = appCode
 	appInstance.Version = appVersion
-	appInstance.Env = env
 	glog.Infof("获取成功,App信息为[code=%s,tenant=%s,version=%s,env=%s].", appInstance.AppCode, appInstance.Tenant, appInstance.Version, appInstance.Env)
 	return
 }
@@ -111,15 +125,16 @@ func appFilelistLoad(appInstance *app.Instance) {
 					if len(configPath) > 0 {
 						configPath = configPath + string(filepath.Separator)
 					} else {
-						configPath = ""
+
+						configPath = fileutils.GetExecRootPath()
 					}
-					filepath := appInstance.Dir + string(filepath.Separator) + configPath + fileName
+					filepath := configPath + fileName
 					//保存配置文件到/apps/uconf目录中
 					data := []byte(fileValue)
 					save(filepath, fileName, data)
 				}
 			} else {
-				glog.Warning("应用[%s]未查询到配置文件信息!", appInstance.AppCode)
+				glog.Warningf("应用[%s]未查询到配置文件信息!", appInstance.AppCode)
 			}
 		} else {
 			glog.Error("查询配置信息返回失败!")

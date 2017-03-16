@@ -1,0 +1,335 @@
+Log file created at: 2016/09/09 22:46:11
+Running on machine: zhouliang
+Binary: Built with gc go1.6 for windows/amd64
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I0909 22:46:11.914502   17924 yamlUitls.go:88] 开始读取Agent配置文件E:\GitHub\ctg_uconf_agent\src\ctg.com\uconf\agent\conf\uconf.yml
+I0909 22:46:11.916505   17924 yamlUitls.go:95] 成功读取Agent配置文件,配置内容如下:
+enabled: true									#是否监听配置变化
+#server:
+# ip: 10.142.90.23   #127.0.0.1					#10.142.90.23 服务端Ip
+# port: 8082										#服务端port
+# context: uconf-web 							#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+server:
+ ip: 127.0.0.1									#10.142.90.23 服务端Ip
+ port: 8080										#服务端port
+ context: 										#服务端的Web根上下文，最终拼接成：http://ip:port/context/***请求服务
+apps:											#本地应用数组
+- name: uconf_demo								#应用名称,可为空,只是方便配置人员识别,程序中不会用到
+  key: eyJhcHBDb2RlIjoidWNvbmZfZGVtbyIsImFwcFZlcnNpb24iOiIxXzBfMF8wIiwiZW52Q29kZSI6InJkIiwidGVuYW50Q29kZSI6ImZqIn0=							#应用的指纹,不可为空,由配置中心提供,
+# key: eyJhcHBDb2RlIjoidWNvbmZfZGVtbyIsImFwcFZlcnNpb24iOiIxXzBfMF8wIiwiZW52Q29kZSI6InJkIiwidGVuYW50Q29kZSI6ImZ6In0=		
+  dir: e:\uconf_demo1							#配置文件存放目录
+#- name: crm_1.0								#这是另外一个应用
+#....
+
+I0909 22:46:11.916505   17924 yamlUitls.go:48] 开始解析Agent配置文件:uconf.yml.
+I0909 22:46:11.916505   17924 yamlUitls.go:54] 成功解析Agent配置文件.
+I0909 22:46:11.916505   17924 yamlUitls.go:61] 开始校验Agent配置文件.
+I0909 22:46:11.916505   17924 yamlUitls.go:82] 校验Agent配置文件通过.
+I0909 22:46:11.923509   17924 Zoo_info.go:40] [Rtn4]获取zk服务器地址列表成功.
+I0909 22:46:11.923509   17924 Zoo_info.go:49] [Rtn2]获取zk根路径成功.
+I0909 22:46:11.923509   17924 Zoo_info.go:56] zk服务器地址列表:127.0.0.1:2181
+I0909 22:46:11.923509   17924 Zoo_info.go:58] zk根路径:/uconf
+I0909 22:46:11.923509   17924 zkMgr.go:115] [Rtn1]开始建立Zk连接.
+I0909 22:46:11.923509   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:11.924510   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnected  <nil> 127.0.0.1:2181}].
+I0909 22:46:11.940523   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateHasSession  <nil> 127.0.0.1:2181}].
+I0909 22:46:11.941521   17924 zkMgr.go:97] 与zk服务器建立连接成功.
+I0909 22:46:11.941521   17924 zkMgr.go:120] [Rtn1]成功建立Zk连接.
+I0909 22:46:11.944523   17924 main.go:75] 开始根据app key,获取app的[name,tenant,version,env]
+I0909 22:46:11.952529   17924 main.go:87] 获取成功,App信息为[name=uconf_demo,tenant=fj,version=rd,env=1_0_0_0].
+I0909 22:46:11.952529   17924 main.go:107] 准备发送Http请求获取应用[uconf_demo]的所有配置文件,请求的Http接口:http://127.0.0.1:8080/api/config/list?configType=file&version=1_0_0_0&app=uconf_demo&env=rd&tenant=fj
+I0909 22:46:11.999563   17924 main.go:299] [Rtn10]配置文件remote.properties内容为:
+remoteHost=127.0.0.12
+remotePort=43p0
+I0909 22:46:11.999563   17924 main.go:300] [Rtn10]开始保存配置文件remote.properties.
+I0909 22:46:12.001565   17924 main.go:299] [Rtn16]配置文件myserver_slave.properties内容为:
+#online
+server=127.0.0.1:16700,127.0.0.1:16700,127.0.0.1:16700,127.0.0.1:16700
+retry=3
+I0909 22:46:12.001565   17924 main.go:300] [Rtn16]开始保存配置文件myserver_slave.properties.
+I0909 22:46:12.004566   17924 main.go:299] [Rtn19]配置文件code.properties内容为:
+syserror.paramtype=\u8bf7\u6c42\u53c2\u6570\u89e3\u6790\u9519" + "\u8bef
+I0909 22:46:12.004566   17924 main.go:300] [Rtn19]开始保存配置文件code.properties.
+I0909 22:46:12.006568   17924 main.go:299] [Rtn20]配置文件testJson.json内容为:
+{"message": {}, "success": "true"}
+I0909 22:46:12.006568   17924 main.go:300] [Rtn20]开始保存配置文件testJson.json.
+I0909 22:46:12.014572   17924 main.go:299] [Rtn21]配置文件autoconfig.properties内容为:
+auto=bbdxxjdccd
+I0909 22:46:12.014572   17924 main.go:300] [Rtn21]开始保存配置文件autoconfig.properties.
+I0909 22:46:12.021577   17924 main.go:299] [Rtn11]配置文件coefficients.properties内容为:
+coefficients.properties
+coe.baiFaCoe=1.3
+coe.yuErBaoCoe=1.3
+
+I0909 22:46:12.021577   17924 main.go:300] [Rtn11]开始保存配置文件coefficients.properties.
+I0909 22:46:12.045595   17924 main.go:299] [Rtn17]配置文件testXml.xml内容为:
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <route sourceHost="*" sourcePort="*"
+        proxyHost="127.0.0.1" proxyPort="8081">
+        <rule>
+            <from method="get">/tradeMap</from>
+            <to method="get">/tradeMap</to>
+        </rule>
+    </route>
+</routes>
+I0909 22:46:12.045595   17924 main.go:300] [Rtn17]开始保存配置文件testXml.xml.
+I0909 22:46:12.193701   17924 main.go:299] [Rtn22]配置文件autoconfig2.properties内容为:
+auto2=cd
+I0909 22:46:12.193701   17924 main.go:300] [Rtn22]开始保存配置文件autoconfig2.properties.
+I0909 22:46:12.239734   17924 main.go:299] [Rtn12]配置文件redis.properties内容为:
+redis.host=127.0.0.1
+
+redis.port=112223
+I0909 22:46:12.239734   17924 main.go:300] [Rtn12]开始保存配置文件redis.properties.
+I0909 22:46:12.251743   17924 main.go:302] [Rtn10]配置文件已保存到:e:\uconf_demo1\remote.properties.
+I0909 22:46:12.251743   17924 main.go:307] [Rtn10]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0909 22:46:12.256745   17924 main.go:329] [Rtn10]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0909 22:46:12.256745   17924 main.go:196] [Rtn10]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.257747   17924 main.go:299] [Rtn14]配置文件empty.properties内容为:
+redis.host=127.0.0.1
+redis.port=8310
+I0909 22:46:12.257747   17924 main.go:300] [Rtn14]开始保存配置文件empty.properties.
+I0909 22:46:12.263751   17924 main.go:299] [Rtn15]配置文件myserver.properties内容为:
+server=127.0.0.1:16600,127.0.0.1:16602,127.0.0.1:16603
+retry=5
+
+I0909 22:46:12.263751   17924 main.go:300] [Rtn15]开始保存配置文件myserver.properties.
+I0909 22:46:12.266752   17924 main.go:299] [Rtn13]配置文件static.properties内容为:
+staticVar=147
+I0909 22:46:12.266752   17924 main.go:300] [Rtn13]开始保存配置文件static.properties.
+I0909 22:46:12.267753   17924 main.go:299] [Rtn18]配置文件testXml2.xml内容为:
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <route sourceHost="*" sourcePort="*"
+        proxyHost="127.0.0.1" proxyPort="8081">
+        <rule>
+            <from method="get">/tradeMap</from>
+            <to method="get">/tradeMap</to>
+        </rule>
+    </route>
+</routes>
+I0909 22:46:12.267753   17924 main.go:300] [Rtn18]开始保存配置文件testXml2.xml.
+I0909 22:46:12.290770   17924 main.go:302] [Rtn16]配置文件已保存到:e:\uconf_demo1\myserver_slave.properties.
+I0909 22:46:12.290770   17924 main.go:307] [Rtn16]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties.
+I0909 22:46:12.296774   17924 main.go:329] [Rtn16]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties.
+I0909 22:46:12.296774   17924 main.go:196] [Rtn16]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.297775   17924 main.go:199] [Rtn10]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.297775   17924 main.go:219] [Rtn10]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0909 22:46:12.319790   17924 main.go:199] [Rtn16]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.372828   17924 main.go:219] [Rtn16]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties.
+I0909 22:46:12.378832   17924 main.go:302] [Rtn20]配置文件已保存到:e:\uconf_demo1\testJson.json.
+I0909 22:46:12.406852   17924 main.go:307] [Rtn20]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json.
+I0909 22:46:12.358817   17924 main.go:302] [Rtn19]配置文件已保存到:e:\uconf_demo1\code.properties.
+I0909 22:46:12.407853   17924 main.go:307] [Rtn19]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties.
+I0909 22:46:12.387838   17924 main.go:302] [Rtn21]配置文件已保存到:e:\uconf_demo1\autoconfig.properties.
+I0909 22:46:12.409854   17924 main.go:307] [Rtn21]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties.
+I0909 22:46:12.398847   17924 main.go:302] [Rtn11]配置文件已保存到:e:\uconf_demo1\coefficients.properties.
+I0909 22:46:12.409854   17924 main.go:307] [Rtn11]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties.
+I0909 22:46:12.402849   17924 main.go:302] [Rtn17]配置文件已保存到:e:\uconf_demo1\testXml.xml.
+I0909 22:46:12.410855   17924 main.go:307] [Rtn17]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml.
+I0909 22:46:12.403850   17924 main.go:302] [Rtn22]配置文件已保存到:e:\uconf_demo1\autoconfig2.properties.
+I0909 22:46:12.412857   17924 main.go:307] [Rtn22]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties.
+I0909 22:46:12.413857   17924 main.go:329] [Rtn22]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties.
+I0909 22:46:12.413857   17924 main.go:196] [Rtn22]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.414857   17924 main.go:329] [Rtn20]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json.
+I0909 22:46:12.414857   17924 main.go:196] [Rtn20]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.415859   17924 main.go:329] [Rtn19]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties.
+I0909 22:46:12.415859   17924 main.go:196] [Rtn19]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.415859   17924 main.go:329] [Rtn21]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties.
+I0909 22:46:12.415859   17924 main.go:196] [Rtn21]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.416859   17924 main.go:329] [Rtn11]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties.
+I0909 22:46:12.418860   17924 main.go:196] [Rtn11]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.418860   17924 main.go:329] [Rtn17]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml.
+I0909 22:46:12.420862   17924 main.go:196] [Rtn17]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.422864   17924 main.go:302] [Rtn12]配置文件已保存到:e:\uconf_demo1\redis.properties.
+I0909 22:46:12.422864   17924 main.go:307] [Rtn12]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0909 22:46:12.425866   17924 main.go:302] [Rtn14]配置文件已保存到:e:\uconf_demo1\empty.properties.
+I0909 22:46:12.425866   17924 main.go:307] [Rtn14]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties.
+I0909 22:46:12.431871   17924 main.go:329] [Rtn14]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties.
+I0909 22:46:12.431871   17924 main.go:196] [Rtn14]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.432871   17924 main.go:199] [Rtn19]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.432871   17924 main.go:219] [Rtn19]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties.
+I0909 22:46:12.434872   17924 main.go:199] [Rtn21]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.480904   17924 main.go:219] [Rtn21]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties.
+I0909 22:46:12.435873   17924 main.go:199] [Rtn22]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.524936   17924 main.go:219] [Rtn22]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties.
+I0909 22:46:12.436874   17924 main.go:302] [Rtn15]配置文件已保存到:e:\uconf_demo1\myserver.properties.
+I0909 22:46:12.556959   17924 main.go:307] [Rtn15]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties.
+I0909 22:46:12.439876   17924 main.go:199] [Rtn11]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.556959   17924 main.go:219] [Rtn11]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties.
+I0909 22:46:12.440876   17924 main.go:302] [Rtn18]配置文件已保存到:e:\uconf_demo1\testXml2.xml.
+I0909 22:46:12.585980   17924 main.go:307] [Rtn18]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml.
+I0909 22:46:12.443879   17924 main.go:199] [Rtn14]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.585980   17924 main.go:219] [Rtn14]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties.
+I0909 22:46:12.435873   17924 main.go:199] [Rtn20]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.610997   17924 main.go:219] [Rtn20]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json.
+I0909 22:46:12.556959   17924 main.go:329] [Rtn15]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties.
+I0909 22:46:12.652027   17924 main.go:196] [Rtn15]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.439876   17924 main.go:302] [Rtn13]配置文件已保存到:e:\uconf_demo1\static.properties.
+I0909 22:46:12.653027   17924 main.go:307] [Rtn13]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties.
+I0909 22:46:12.586980   17924 main.go:329] [Rtn18]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml.
+I0909 22:46:12.656030   17924 main.go:196] [Rtn18]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.446880   17924 main.go:199] [Rtn17]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.656030   17924 main.go:219] [Rtn17]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml.
+I0909 22:46:12.662034   17924 main.go:329] [Rtn13]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties.
+I0909 22:46:12.723077   17924 main.go:196] [Rtn13]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.435873   17924 main.go:329] [Rtn12]校验成功,Zk上存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0909 22:46:12.723077   17924 main.go:196] [Rtn12]开始创建Agent实例临时节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.687052   17924 main.go:199] [Rtn18]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.723077   17924 main.go:219] [Rtn18]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml.
+I0909 22:46:12.732083   17924 main.go:199] [Rtn12]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.761105   17924 main.go:219] [Rtn12]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0909 22:46:12.735085   17924 main.go:199] [Rtn13]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.791126   17924 main.go:219] [Rtn13]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties.
+I0909 22:46:12.687052   17924 main.go:199] [Rtn15]Agent实例临时节点创建成功:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties/zhouliang_127.0.0.1_ef4a6627d7d24999abed2cfc9fa74f06.
+I0909 22:46:12.817144   17924 main.go:219] [Rtn15]开始监听配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties.
+I0909 22:46:20.684427   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateDisconnected  <nil> 127.0.0.1:2181}].
+E0909 22:46:20.684427   17924 zkMgr.go:61] 与zk服务器连接失败.开始重试.
+I0909 22:46:20.686428   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:21.687183   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:23.688563   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+E0909 22:46:25.686998   17924 zkMgr.go:100] 与zk服务器建立连接超时.
+I0909 22:46:25.691001   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:25.691001   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateDisconnected  <nil> 127.0.0.1:2181}].
+E0909 22:46:25.691001   17924 retryer.go:97] [Rtn1]与zk服务器建立连接超时 , 将在5秒后将重试.
+I0909 22:46:30.691215   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:30.692099   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnected  <nil> 127.0.0.1:2181}].
+I0909 22:46:30.748138   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateHasSession  <nil> 127.0.0.1:2181}].
+I0909 22:46:30.748138   17924 zkMgr.go:97] 与zk服务器建立连接成功.
+I0909 22:46:30.748138   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnecting  <nil> 127.0.0.1:2181}].
+I0909 22:46:30.748138   17924 main.go:236] [Rtn15]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.748138   17924 main.go:236] [Rtn17]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.748138   17924 main.go:236] [Rtn10]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.748138   17924 main.go:236] [Rtn16]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.748138   17924 main.go:287] [Rtn10]开始下载配置文件:remote.properties
+I0909 22:46:30.748138   17924 main.go:287] [Rtn16]开始下载配置文件:myserver_slave.properties
+I0909 22:46:30.748138   17924 main.go:236] [Rtn18]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.748138   17924 main.go:287] [Rtn18]开始下载配置文件:testXml2.xml
+I0909 22:46:30.749141   17924 main.go:236] [Rtn12]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.750142   17924 main.go:236] [Rtn19]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.751142   17924 main.go:287] [Rtn19]开始下载配置文件:code.properties
+I0909 22:46:30.751142   17924 main.go:287] [Rtn12]开始下载配置文件:redis.properties
+I0909 22:46:30.752143   17924 main.go:236] [Rtn11]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.752143   17924 main.go:287] [Rtn11]开始下载配置文件:coefficients.properties
+I0909 22:46:30.753143   17924 main.go:236] [Rtn13]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.753143   17924 main.go:287] [Rtn13]开始下载配置文件:static.properties
+I0909 22:46:30.755144   17924 main.go:287] [Rtn17]开始下载配置文件:testXml.xml
+I0909 22:46:30.796173   17924 main.go:290] [Rtn12]下载配置文件redis.properties成功.
+I0909 22:46:30.797174   17924 main.go:299] [Rtn12]配置文件redis.properties内容为:
+redis.host=127.0.0.1
+
+redis.port=112223
+I0909 22:46:30.797174   17924 main.go:300] [Rtn12]开始保存配置文件redis.properties.
+I0909 22:46:30.797174   17924 main.go:290] [Rtn11]下载配置文件coefficients.properties成功.
+I0909 22:46:30.797174   17924 main.go:299] [Rtn11]配置文件coefficients.properties内容为:
+coefficients.properties
+coe.baiFaCoe=1.3
+coe.yuErBaoCoe=1.3
+
+I0909 22:46:30.797174   17924 main.go:300] [Rtn11]开始保存配置文件coefficients.properties.
+I0909 22:46:30.797174   17924 main.go:236] [Rtn21]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.797174   17924 main.go:287] [Rtn21]开始下载配置文件:autoconfig.properties
+I0909 22:46:30.799176   17924 main.go:236] [Rtn22]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.799176   17924 main.go:287] [Rtn22]开始下载配置文件:autoconfig2.properties
+I0909 22:46:30.800177   17924 main.go:236] [Rtn14]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.800177   17924 main.go:287] [Rtn14]开始下载配置文件:empty.properties
+I0909 22:46:30.812185   17924 main.go:236] [Rtn20]与ZK服务器重连成功,准备重新获取配置.
+I0909 22:46:30.812185   17924 main.go:287] [Rtn20]开始下载配置文件:testJson.json
+I0909 22:46:30.814187   17924 main.go:287] [Rtn15]开始下载配置文件:myserver.properties
+I0909 22:46:30.816187   17924 main.go:290] [Rtn16]下载配置文件myserver_slave.properties成功.
+I0909 22:46:30.816187   17924 main.go:299] [Rtn16]配置文件myserver_slave.properties内容为:
+#online
+server=127.0.0.1:16700,127.0.0.1:16700,127.0.0.1:16700,127.0.0.1:16700
+retry=3
+I0909 22:46:30.816187   17924 main.go:300] [Rtn16]开始保存配置文件myserver_slave.properties.
+I0909 22:46:30.818188   17924 main.go:290] [Rtn19]下载配置文件code.properties成功.
+I0909 22:46:30.818188   17924 main.go:299] [Rtn19]配置文件code.properties内容为:
+syserror.paramtype=\u8bf7\u6c42\u53c2\u6570\u89e3\u6790\u9519" + "\u8bef
+I0909 22:46:30.818188   17924 main.go:300] [Rtn19]开始保存配置文件code.properties.
+I0909 22:46:30.841204   17924 main.go:290] [Rtn20]下载配置文件testJson.json成功.
+I0909 22:46:30.841204   17924 main.go:299] [Rtn20]配置文件testJson.json内容为:
+{"message": {}, "success": "true"}
+I0909 22:46:30.841204   17924 main.go:300] [Rtn20]开始保存配置文件testJson.json.
+I0909 22:46:30.850212   17924 main.go:290] [Rtn14]下载配置文件empty.properties成功.
+I0909 22:46:30.850212   17924 main.go:299] [Rtn14]配置文件empty.properties内容为:
+redis.host=127.0.0.1
+redis.port=8310
+I0909 22:46:30.850212   17924 main.go:300] [Rtn14]开始保存配置文件empty.properties.
+I0909 22:46:30.850212   17924 main.go:302] [Rtn12]配置文件已保存到:e:\uconf_demo1\redis.properties.
+I0909 22:46:30.850212   17924 main.go:307] [Rtn12]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/redis.properties.
+I0909 22:46:30.850212   17924 main.go:290] [Rtn17]下载配置文件testXml.xml成功.
+I0909 22:46:30.850212   17924 main.go:299] [Rtn17]配置文件testXml.xml内容为:
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <route sourceHost="*" sourcePort="*"
+        proxyHost="127.0.0.1" proxyPort="8081">
+        <rule>
+            <from method="get">/tradeMap</from>
+            <to method="get">/tradeMap</to>
+        </rule>
+    </route>
+</routes>
+I0909 22:46:30.850212   17924 main.go:300] [Rtn17]开始保存配置文件testXml.xml.
+I0909 22:46:30.851212   17924 main.go:290] [Rtn10]下载配置文件remote.properties成功.
+I0909 22:46:30.851212   17924 main.go:299] [Rtn10]配置文件remote.properties内容为:
+remoteHost=127.0.0.12
+remotePort=43p0
+I0909 22:46:30.851212   17924 main.go:300] [Rtn10]开始保存配置文件remote.properties.
+I0909 22:46:30.852213   17924 main.go:290] [Rtn21]下载配置文件autoconfig.properties成功.
+I0909 22:46:30.852213   17924 main.go:290] [Rtn18]下载配置文件testXml2.xml成功.
+I0909 22:46:30.852213   17924 main.go:299] [Rtn21]配置文件autoconfig.properties内容为:
+auto=bbdxxjdccd
+I0909 22:46:30.852213   17924 main.go:300] [Rtn21]开始保存配置文件autoconfig.properties.
+I0909 22:46:30.852213   17924 main.go:299] [Rtn18]配置文件testXml2.xml内容为:
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <route sourceHost="*" sourcePort="*"
+        proxyHost="127.0.0.1" proxyPort="8081">
+        <rule>
+            <from method="get">/tradeMap</from>
+            <to method="get">/tradeMap</to>
+        </rule>
+    </route>
+</routes>
+I0909 22:46:30.852213   17924 main.go:300] [Rtn18]开始保存配置文件testXml2.xml.
+I0909 22:46:30.853212   17924 main.go:302] [Rtn11]配置文件已保存到:e:\uconf_demo1\coefficients.properties.
+I0909 22:46:30.853212   17924 main.go:307] [Rtn11]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/coefficients.properties.
+I0909 22:46:30.859217   17924 main.go:302] [Rtn16]配置文件已保存到:e:\uconf_demo1\myserver_slave.properties.
+I0909 22:46:30.859217   17924 main.go:307] [Rtn16]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver_slave.properties.
+I0909 22:46:30.860218   17924 main.go:290] [Rtn13]下载配置文件static.properties成功.
+I0909 22:46:30.860218   17924 main.go:299] [Rtn13]配置文件static.properties内容为:
+staticVar=147
+I0909 22:46:30.860218   17924 main.go:300] [Rtn13]开始保存配置文件static.properties.
+I0909 22:46:30.860218   17924 main.go:302] [Rtn19]配置文件已保存到:e:\uconf_demo1\code.properties.
+I0909 22:46:30.860218   17924 main.go:307] [Rtn19]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/code.properties.
+I0909 22:46:30.861218   17924 main.go:302] [Rtn20]配置文件已保存到:e:\uconf_demo1\testJson.json.
+I0909 22:46:30.861218   17924 main.go:307] [Rtn20]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testJson.json.
+I0909 22:46:30.862219   17924 main.go:302] [Rtn14]配置文件已保存到:e:\uconf_demo1\empty.properties.
+I0909 22:46:30.862219   17924 main.go:307] [Rtn14]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/empty.properties.
+I0909 22:46:30.862219   17924 main.go:302] [Rtn17]配置文件已保存到:e:\uconf_demo1\testXml.xml.
+I0909 22:46:30.862219   17924 main.go:307] [Rtn17]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml.xml.
+I0909 22:46:30.863220   17924 main.go:302] [Rtn10]配置文件已保存到:e:\uconf_demo1\remote.properties.
+I0909 22:46:30.863220   17924 main.go:307] [Rtn10]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/remote.properties.
+I0909 22:46:30.864221   17924 main.go:302] [Rtn18]配置文件已保存到:e:\uconf_demo1\testXml2.xml.
+I0909 22:46:30.864221   17924 main.go:307] [Rtn18]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/testXml2.xml.
+I0909 22:46:30.864221   17924 main.go:302] [Rtn21]配置文件已保存到:e:\uconf_demo1\autoconfig.properties.
+I0909 22:46:30.864221   17924 main.go:307] [Rtn21]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig.properties.
+I0909 22:46:30.865221   17924 main.go:302] [Rtn13]配置文件已保存到:e:\uconf_demo1\static.properties.
+I0909 22:46:30.865221   17924 main.go:307] [Rtn13]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/static.properties.
+I0909 22:46:30.867222   17924 main.go:290] [Rtn15]下载配置文件myserver.properties成功.
+I0909 22:46:30.867222   17924 main.go:299] [Rtn15]配置文件myserver.properties内容为:
+server=127.0.0.1:16600,127.0.0.1:16602,127.0.0.1:16603
+retry=5
+
+I0909 22:46:30.867222   17924 main.go:300] [Rtn15]开始保存配置文件myserver.properties.
+I0909 22:46:30.867222   17924 main.go:290] [Rtn22]下载配置文件autoconfig2.properties成功.
+I0909 22:46:30.867222   17924 main.go:299] [Rtn22]配置文件autoconfig2.properties内容为:
+auto2=cd
+I0909 22:46:30.867222   17924 main.go:300] [Rtn22]开始保存配置文件autoconfig2.properties.
+I0909 22:46:30.867222   17924 main.go:302] [Rtn15]配置文件已保存到:e:\uconf_demo1\myserver.properties.
+I0909 22:46:30.867222   17924 main.go:307] [Rtn15]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/myserver.properties.
+I0909 22:46:30.867222   17924 main.go:302] [Rtn22]配置文件已保存到:e:\uconf_demo1\autoconfig2.properties.
+I0909 22:46:30.867222   17924 main.go:307] [Rtn22]开始校验Zk上是否存在配置文件节点:/uconf/fj_uconf_demo_1_0_0_0_rd/file/autoconfig2.properties.
+I0909 22:46:31.750851   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateConnected  <nil> 127.0.0.1:2181}].
+I0909 22:46:31.762860   17924 zkMgr.go:43] 监听到Zk连接状态变更事件[{EventSession StateHasSession  <nil> 127.0.0.1:2181}].

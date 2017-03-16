@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"os/exec"
+
 	"github.com/golang/glog"
 )
 
@@ -53,4 +55,11 @@ func checkErr(e error) {
 		glog.Fatalf("文件处理异常:", e)
 		panic(e)
 	}
+}
+
+func GetExecRootPath() string {
+	file, _ := exec.LookPath(os.Args[0])
+	path, _ := filepath.Abs(file)
+	dir, _ := filepath.Split(path)
+	return dir
 }
