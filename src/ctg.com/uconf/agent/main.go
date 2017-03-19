@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
+	"bufio"
 	"path/filepath"
 	"strings"
 
@@ -16,6 +18,7 @@ import (
 	"ctg.com/uconf/agent/httpclient"
 	"ctg.com/uconf/agent/retryer"
 	"github.com/golang/glog"
+	"github.com/magiconair/properties"
 )
 
 var autoReload bool
@@ -31,12 +34,38 @@ var cmdcontext = flag.String("context", "", "服务端上下文")
 var cmdapp = flag.String("app", "", "应用编码")
 var cmdtenant = flag.String("tenant", "", "租户编码")
 var cmdversion = flag.String("version", "", "版本信息")
+var cmdkeys = flag.String("keys", "", "待替换的键值")
+var keys []string
+var cmdFilepath = flag.String("filepath", "", "待替换的properties文件绝对路径")
+var op string
+var cmdCmd = flag.String("cmd", "", "命令")
+var changed = false
+var p *properties.Properties
 
 //window测试命令：e: & cd E:\GitHub\ctg_uconf_agent\src\ctg.com\uconf & agent.exe &echo success download config & c: & cd C:\Home\Programs Files\apache-tomcat-6.0.43\apache-tomcat-6.0.43\bin & startup.bat
-//> agent.exe -server 10.142.90.23 -port 9090  -context uconf-web -app uconf_demo -tenant fz -version 1_0_0_0
+//> agent.exe -replace=true -server=10.142.90.23 -port=9090  -context=uconf-web -app=uconf_demo -tenant=ctg -version=1_0_0_0 -keys=password,server,acbd,url -filepath=E:\\GitHub\\ctg_uconf_agent\\src\\ctg.com\\uconf\\agent\\myserver.properties
+
 func main() {
 	flag.Parse()
 	defer glog.Flush()
+	fmt.Print(*cmdCmd)
+	if "replace" == strings.TrimSpace(*cmdCmd) {
+		fmt.Println("true--")
+		if len(*cmdkeys) < 1 {
+			return
+		}
+		if _, err := os.Stat(*cmdFilepath); err != nil {
+			if os.IsNotExist(err) {
+				fmt.Println("-filepath 配置的文件绝对路径不存在。")
+				os.Exit(1)
+			} else {
+				panic(err)
+			}
+		} else {
+			p = properties.MustLoadFile(*cmdFilepath, properties.UTF8)
+		}
+		keys = strings.Split(*cmdkeys, ",")
+	}
 	MainRoutineContext = context.InitMainRoutineContext()
 	//定时flush日志
 	flushLog()
@@ -56,8 +85,19 @@ func main() {
 	appInstance := app.NewInstance(machine.Ip, machine.HoseName)
 	//根据命令行传入的key获取应用的详细信息,fz|uconf_demo|1_0_0_0|1
 	loadAppInfoFromEnv(appInstance)
-	//根据应用的详细信息下载应用配置
-	appFilelistLoad(appInstance)
+	if "replace" == strings.TrimSpace(*cmdCmd) {
+		appUpdateItems(appInstance)
+		if changed {
+			os.Remove(*cmdFilepath)
+			f, _ := os.Create(*cmdFilepath)
+			bufwriter := bufio.NewWriter(f)
+			p.Write(bufwriter, properties.UTF8)
+			bufwriter.Flush()
+		}
+	} else {
+		//根据应用的详细信息下载应用配置
+		appFilelistLoad(appInstance)
+	}
 
 }
 
@@ -99,6 +139,54 @@ func loadAppInfoFromEnv(appInstance *app.Instance) {
 	appInstance.Version = appVersion
 	glog.Infof("获取成功,App信息为[code=%s,tenant=%s,version=%s,env=%s].", appInstance.AppCode, appInstance.Tenant, appInstance.Version, appInstance.Env)
 	return
+}
+
+//调用配置中心接口，下载应用下的所有已发布的配置文件
+func appUpdateItems(appInstance *app.Instance) {
+	listUrl := itemlistLoadUrl(cfglistAction, appInstance)
+	glog.Infof("准备发送Http请求获取应用[%s]的所有配置文件,请求的Http接口:%s", appInstance.AppCode, listUrl)
+	//下载所有的配置
+	conflistContext := context.NewRequestRoutineContext(listUrl, nil)
+	listOutut := httpclient.RetryableGetFileList(conflistContext)
+	fmt.Println(listOutut)
+	if listOutut.Err != nil {
+		glog.Error("查询配置信息出现异常!")
+		panic("查询配置信息出现异常!")
+	}
+	if cfglist, ok := listOutut.Result.(httpclient.CfgListRespose); ok {
+		if "true" == cfglist.Success {
+			if len(cfglist.Result) > 0 {
+				for _, cfg := range cfglist.Result {
+					if "item" != cfg.ConfigType {
+						continue
+					}
+					itemName := cfg.ConfigName
+					itemValue := cfg.ConfigValue
+					if hasKey(itemName) {
+						p.Set(itemName, itemValue)
+						changed = true
+					}
+				}
+			} else {
+				glog.Warningf("应用[%s]未查询到配置文件信息!", appInstance.AppCode)
+			}
+		} else {
+			glog.Error("查询配置信息返回失败!")
+			glog.Errorf("返回的详细内容为:%v", cfglist)
+			panic("查询配置信息返回失败!")
+		}
+	} else {
+		glog.Error("查询配置信息出现异常!")
+		panic("查询配置信息出现异常!")
+	}
+}
+func hasKey(itemName string) bool {
+	for _, v := range keys {
+		if strings.TrimSpace(itemName) == strings.TrimSpace(v) {
+			return true
+		}
+	}
+	return false
 }
 
 //调用配置中心接口，下载应用下的所有已发布的配置文件
@@ -153,6 +241,10 @@ func fileDownloadUrl(serverAddr string, appInstance *app.Instance, filename stri
 
 func filelistLoadUrl(serverAddr string, appInstance *app.Instance) string {
 	return serverAddr + "?configType=file&version=" + appInstance.Version + "&app=" + appInstance.AppCode + "&tenant=" + appInstance.Tenant + "&env=" + appInstance.Env
+}
+
+func itemlistLoadUrl(serverAddr string, appInstance *app.Instance) string {
+	return serverAddr + "?configType=item&version=" + appInstance.Version + "&app=" + appInstance.AppCode + "&tenant=" + appInstance.Tenant + "&env=" + appInstance.Env
 }
 
 func save(filepath, filename string, data []byte) {
