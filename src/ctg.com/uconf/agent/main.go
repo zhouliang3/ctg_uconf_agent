@@ -39,18 +39,18 @@ var keys []string
 var cmdFilepath = flag.String("filepath", "", "待替换的properties文件绝对路径")
 var op string
 var cmdCmd = flag.String("cmd", "", "命令")
+var cmdBak = flag.Bool("bak", true, "是否备份原配置文件")
 var changed = false
 var p *properties.Properties
 
 //window测试命令：e: & cd E:\GitHub\ctg_uconf_agent\src\ctg.com\uconf & agent.exe &echo success download config & c: & cd C:\Home\Programs Files\apache-tomcat-6.0.43\apache-tomcat-6.0.43\bin & startup.bat
-//> agent.exe -replace=true -server=10.142.90.23 -port=9090  -context=uconf-web -app=uconf_demo -tenant=ctg -version=1_0_0_0 -keys=password,server,acbd,url -filepath=E:\\GitHub\\ctg_uconf_agent\\src\\ctg.com\\uconf\\agent\\myserver.properties
+//> agent.exe -cmd=replace -server=10.142.90.23 -port=9090  -context=uconf-web -app=uconf_demo -tenant=ctg -version=1_0_0_0 -keys=password,server,acbd,url -filepath=E:\\GitHub\\ctg_uconf_agent\\src\\ctg.com\\uconf\\agent\\myserver.properties
 
 func main() {
 	flag.Parse()
 	defer glog.Flush()
 	fmt.Print(*cmdCmd)
 	if "replace" == strings.TrimSpace(*cmdCmd) {
-		fmt.Println("true--")
 		if len(*cmdkeys) < 1 {
 			return
 		}
@@ -88,6 +88,10 @@ func main() {
 	if "replace" == strings.TrimSpace(*cmdCmd) {
 		appUpdateItems(appInstance)
 		if changed {
+			if *cmdBak {
+				os.Remove(*cmdFilepath + ".bak")
+				os.Rename(*cmdFilepath, *cmdFilepath+".bak")
+			}
 			os.Remove(*cmdFilepath)
 			f, _ := os.Create(*cmdFilepath)
 			bufwriter := bufio.NewWriter(f)
@@ -213,7 +217,6 @@ func appFilelistLoad(appInstance *app.Instance) {
 					if len(configPath) > 0 {
 						configPath = configPath + string(filepath.Separator)
 					} else {
-
 						configPath = fileutils.GetExecRootPath()
 					}
 					filepath := configPath + fileName
